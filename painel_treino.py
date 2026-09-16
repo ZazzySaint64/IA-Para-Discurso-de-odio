@@ -112,21 +112,43 @@ if os.path.exists(FEEDBACK_CSV):
 else:
     st.write("Nenhum exemplo guardado ainda. Ensine algo no passo 1 primeiro.")
 
+if "resultado_treino" not in st.session_state:
+    st.session_state.resultado_treino = None
+
+resultado = st.session_state.resultado_treino
+if resultado:
+    if resultado["sucesso"]:
+        st.success(
+            f"Última atualização, {resultado['quando']}: modelo treinado com {resultado['n_exemplos']} "
+            f"exemplos. Qualidade estimada (F1 macro): {resultado['f1']:.4f}"
+        )
+    else:
+        st.error(f"Última tentativa de atualização, {resultado['quando']}, falhou: {resultado['erro']}")
+
 if st.button("Atualizar modelo agora", help="Retreina e substitui o modelo atual usando os exemplos guardados."):
     with st.spinner("Atualizando o modelo... isso pode levar alguns segundos."):
-        dados = carregar_dados()
-        pipeline = Pipeline([
-            ("tfidf", TfidfVectorizer(max_features=5000, ngram_range=(1, 2))),
-            ("clf", LogisticRegression(class_weight="balanced")),
-        ])
-        validador = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-        scores = cross_val_score(
-            pipeline, dados["comentario"], dados["label_final"], cv=validador, scoring="f1_macro"
-        )
-        pipeline.fit(dados["comentario"], dados["label_final"])
-        joblib.dump(pipeline.named_steps["clf"], MODELO_PATH)
-        joblib.dump(pipeline.named_steps["tfidf"], VETORIZADOR_PATH)
-    st.success(f"Modelo atualizado com {len(dados)} exemplos no total. Qualidade estimada (F1 macro): {scores.mean():.4f}")
+        quando = datetime.now().strftime("%d/%m %H:%M:%S")
+        try:
+            dados = carregar_dados()
+            pipeline = Pipeline([
+                ("tfidf", TfidfVectorizer(max_features=5000, ngram_range=(1, 2))),
+                ("clf", LogisticRegression(class_weight="balanced")),
+            ])
+            validador = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+            scores = cross_val_score(
+                pipeline, dados["comentario"], dados["label_final"], cv=validador, scoring="f1_macro"
+            )
+            pipeline.fit(dados["comentario"], dados["label_final"])
+            joblib.dump(pipeline.named_steps["clf"], MODELO_PATH)
+            joblib.dump(pipeline.named_steps["tfidf"], VETORIZADOR_PATH)
+            st.session_state.resultado_treino = {
+                "sucesso": True,
+                "quando": quando,
+                "n_exemplos": len(dados),
+                "f1": scores.mean(),
+            }
+        except Exception as e:
+            st.session_state.resultado_treino = {"sucesso": False, "quando": quando, "erro": str(e)}
     st.rerun()
 
 # python -m streamlit run painel_treino.py (CÓDIGO DE EXECUÇÃO)
