@@ -28,6 +28,7 @@ Pra rodar do zero:
 ```
 python -m streamlit run classificador.py
 ```
+![Tela do classificador](docs/classificador.png)
 
 **`painel_treino.py`** é onde eu ensino o modelo. Fica atrás de senha porque só eu devo mexer nisso.
 
@@ -45,6 +46,8 @@ python -m streamlit run painel_treino.py
 ```
 Lá dentro: escrevo um comentário, escolho se é ódio ou não, clico em "Guardar este exemplo". Vou fazendo isso quantas vezes quiser e, quando achar que já deu, clico em "Atualizar modelo agora", ele retreina com tudo que eu ensinei até ali.
 
+![Painel de treino logado](docs/painel_treino.png)
+
 Também tem o `retreinar.bat`, um atalho de duplo clique que roda o retreino e guarda o log.
 
 ## Segurança do painel de treino
@@ -55,6 +58,8 @@ Também tem o `retreinar.bat`, um atalho de duplo clique que roda o retreino e g
 - Servidor Streamlit escuta só em `127.0.0.1` por padrão (`.streamlit/config.toml`), não expõe a porta pra rede sem eu configurar isso explicitamente.
 
 Isso é suficiente pra uso pessoal local. Se algum dia eu hospedar isso num servidor público, preciso somar HTTPS na frente.
+
+![Bloqueio depois de tentativa errada](docs/painel_treino_bloqueio.png)
 
 ## O resto do código (não roda sozinho, é usado pelos dois de cima)
 
