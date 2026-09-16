@@ -1,5 +1,7 @@
+import hashlib
 import hmac
 import os
+import time
 from datetime import datetime
 
 import joblib
@@ -12,7 +14,8 @@ from sklearn.pipeline import Pipeline
 
 from dados_treino import BASE, FEEDBACK_CSV, carregar_dados
 
-SENHA_ENV = "HATEBR_SENHA_TREINO"
+SENHA_HASH_ENV = "HATEBR_SENHA_HASH"
+MAX_TENTATIVAS = 5
 MODELO_PATH = os.path.join(BASE, "modelo_logistic_regression.pkl")
 VETORIZADOR_PATH = os.path.join(BASE, "vetorizador.pkl")
 
@@ -21,30 +24,44 @@ st.caption("Área restrita. Aqui você ensina o modelo mostrando exemplos e dize
 
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
+if "tentativas" not in st.session_state:
+    st.session_state.tentativas = 0
 
 if not st.session_state.autenticado:
-    senha_esperada = os.environ.get(SENHA_ENV)
-    if not senha_esperada:
+    hash_esperado = os.environ.get(SENHA_HASH_ENV)
+    if not hash_esperado:
         st.error(
-            f"Variável de ambiente {SENHA_ENV} não definida. "
-            f"Defina-a (ex.: $env:{SENHA_ENV}=\"sua_senha\") antes de rodar esta página."
+            f"Variável de ambiente {SENHA_HASH_ENV} não definida. "
+            "Rode `python gerar_hash_senha.py` pra criar sua senha e ver como definir essa variável."
         )
+        st.stop()
+
+    if st.session_state.tentativas >= MAX_TENTATIVAS:
+        st.error("Muitas tentativas erradas. Feche e abra esta página de novo pra tentar outra vez.")
         st.stop()
 
     senha_digitada = st.text_input(
         "Senha de acesso",
         type="password",
-        help="Só quem sabe essa senha consegue ensinar o modelo. Ela vem da variável de ambiente HATEBR_SENHA_TREINO.",
+        help="Só quem sabe essa senha consegue ensinar o modelo.",
     )
     if st.button("Entrar", help="Confere a senha digitada e libera o painel de treino."):
-        if hmac.compare_digest(senha_digitada, senha_esperada):
+        hash_digitado = hashlib.sha256(senha_digitada.encode("utf-8")).hexdigest()
+        if hmac.compare_digest(hash_digitado, hash_esperado):
             st.session_state.autenticado = True
+            st.session_state.tentativas = 0
             st.rerun()
         else:
-            st.error("Senha incorreta.")
+            st.session_state.tentativas += 1
+            time.sleep(1.5)
+            st.error(f"Senha incorreta. Tentativa {st.session_state.tentativas} de {MAX_TENTATIVAS}.")
     st.stop()
 
-st.success("Acesso liberado. Você já pode ensinar o modelo.")
+col_status, col_sair = st.columns([4, 1])
+col_status.success("Acesso liberado. Você já pode ensinar o modelo.")
+if col_sair.button("Sair"):
+    st.session_state.autenticado = False
+    st.rerun()
 
 modelo = joblib.load(MODELO_PATH)
 vetorizador = joblib.load(VETORIZADOR_PATH)
