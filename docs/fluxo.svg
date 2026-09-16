@@ -15,7 +15,7 @@
   <!-- Feedback -->
   <rect x="30" y="150" width="180" height="70" rx="10" fill="#1f2937" stroke="#374151" />
   <text x="120" y="178" fill="#e5e7eb" font-size="14" text-anchor="middle" font-weight="600">feedback_treino.csv</text>
-  <text x="120" y="198" fill="#9ca3af" font-size="12" text-anchor="middle">os rótulos</text>
+  <text x="120" y="198" fill="#9ca3af" font-size="12" text-anchor="middle">meus rótulos</text>
 
   <!-- Painel treino -->
   <rect x="30" y="260" width="180" height="80" rx="10" fill="#312e1f" stroke="#8a6d1f" />
