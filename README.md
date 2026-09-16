@@ -1,46 +1,47 @@
 # IA para Discurso de Ódio
 
-Uma IA em treinamento para detectar frases e analisar se é discurso de ódio ou não. Classifica um comentário em português como discurso de ódio ou não, e aprende com rótulos que você mesmo dá a ela.
+Uma IA em treinamento pra detectar se uma frase é discurso de ódio ou não. A ideia é simples: eu mostro exemplos pra ela, digo se é ódio ou não, e ela vai aprendendo com isso. Só eu tenho acesso a esse treinamento, pra não deixar qualquer um ensinando errado pro modelo.
 
-## Antes de rodar
+## antes de rodar
 
-Este repositório tem só o código. Datasets, modelo treinado e rótulos ficam de fora (`.gitignore`) — veja por quê na tabela "Arquivos gerados automaticamente" abaixo.
+Esse repositório tem só o código. Não subi dataset, modelo treinado nem os rótulos que eu fui dando (tá tudo no `.gitignore`) — datasets acadêmicos têm licença própria, e os rótulos são coisa minha mesmo.
+
+Pra rodar do zero:
 
 1. `pip install -r requirements.txt`
-2. Baixe os datasets [HateBR](https://github.com/franciellevargas/HateBR) e [ToLD-BR](https://github.com/JAugusto97/ToLD-Br) (cada um tem sua própria licença — leia antes de usar) e coloque em `HateBR-7.0.0/dataset/HateBR.csv` e `HateBR-7.0.0/dataset/ToLD-BR.csv`.
-3. Rode `python retreinar_modelo.py` uma vez pra gerar `modelo_logistic_regression.pkl` e `vetorizador.pkl`.
+2. Baixa o [HateBR](https://github.com/franciellevargas/HateBR) e o [ToLD-BR](https://github.com/JAugusto97/ToLD-Br) (cada um com sua licença, dá uma lida antes) e joga em `HateBR-7.0.0/dataset/HateBR.csv` e `HateBR-7.0.0/dataset/ToLD-BR.csv`.
+3. Roda `python retreinar_modelo.py` uma vez pra gerar o `modelo_logistic_regression.pkl` e o `vetorizador.pkl`.
 
-## O que rodar
+## as duas telas
 
-| Arquivo | O que é | Como rodar |
-|---|---|---|
-| `classificador.py` | Tela pública: qualquer um digita um comentário e vê o palpite do modelo. | `python -m streamlit run classificador.py` |
-| `painel_treino.py` | Tela protegida por senha: só você ensina o modelo com novos exemplos e manda ele se atualizar. | Definir `HATEBR_SENHA_TREINO` antes, depois `python -m streamlit run painel_treino.py` |
-| `retreinar.bat` | Atalho (duplo clique) que roda `retreinar_modelo.py` e guarda o log em `historico_execucoes.log`. | Duplo clique no arquivo |
+**`classificador.py`** é a parte pública: qualquer um digita um comentário e vê o que o modelo acha.
+```
+python -m streamlit run classificador.py
+```
 
-## Arquivos de código (suporte, não roda direto)
+**`painel_treino.py`** é onde eu ensino o modelo. Fica atrás de senha porque só eu devo mexer nisso.
+```
+setx HATEBR_SENHA_TREINO "sua_senha"
+```
+(fecha e abre o terminal de novo pra pegar a senha, aí roda)
+```
+python -m streamlit run painel_treino.py
+```
+Lá dentro: escrevo um comentário, escolho se é ódio ou não, clico em "Guardar este exemplo". Vou fazendo isso quantas vezes quiser e, quando achar que já deu, clico em "Atualizar modelo agora" — ele retreina com tudo que eu ensinei até ali.
 
-| Arquivo | O que faz |
-|---|---|
-| `dados_treino.py` | Junta os dois datasets (HateBR + ToLD-BR) e, se existir, soma os exemplos que você ensinou em `painel_treino.py`. Usado por `retreinar_modelo.py` e `painel_treino.py`. |
-| `retreinar_modelo.py` | Treina o modelo do zero com validação cruzada. Só salva o modelo novo se ele for melhor que o salvo em `best_score.json`. |
-| `testar_modelo.py` | Teste rápido: carrega o modelo salvo e classifica uma frase de exemplo, só pra conferir que os arquivos `.pkl` não estão corrompidos. Usado por `classificador.py`. |
-| `test_dados_treino.py` | Checagem automática de que `dados_treino.py` está carregando os dados direito. |
+Também tem o `retreinar.bat`, um atalho de duplo clique que roda o retreino e guarda o log.
 
-## Arquivos gerados automaticamente (não editar à mão)
+## o resto do código (não roda sozinho, é usado pelos dois de cima)
 
-| Arquivo | O que é |
-|---|---|
-| `modelo_logistic_regression.pkl` | O modelo treinado (o "cérebro" que decide ódio ou não). |
-| `vetorizador.pkl` | Converte texto em números pro modelo entender. Tem que ser sempre o par do modelo acima. |
-| `best_score.json` | Guarda a melhor nota (F1 macro) já alcançada, pra `retreinar_modelo.py` saber se vale a pena substituir o modelo. |
-| `feedback_treino.csv` | Todos os exemplos que você ensinou em `painel_treino.py`, aguardando ou já usados no treino. |
-| `historico_execucoes.log` | Log de cada vez que `retreinar.bat` rodou. |
-| `HateBR-7.0.0/` | Pasta com os datasets originais (HateBR.csv e ToLD-BR.csv) usados no treino. Não mexer. |
+- `dados_treino.py` — junta o HateBR com o ToLD-BR e, se eu já tiver ensinado alguma coisa, soma os meus exemplos também.
+- `retreinar_modelo.py` — treina do zero com validação cruzada. Só troca o modelo salvo se o novo for melhor.
+- `testar_modelo.py` — teste rápido, só pra conferir que os `.pkl` não estão corrompidos.
+- `test_dados_treino.py` — checagem automática de que os dados estão carregando certo.
 
-## Como ensinar o modelo (resumo)
+## o que fica de fora do repositório (gerado na hora, não mexe à mão)
 
-1. Defina a senha uma vez: `setx HATEBR_SENHA_TREINO "sua_senha"` (feche e abra o terminal depois).
-2. Rode `painel_treino.py`, entre com a senha.
-3. Escreva um comentário, escolha o rótulo certo, clique em "Guardar este exemplo".
-4. Repita quantas vezes quiser, depois clique em "Atualizar modelo agora".
+- `modelo_logistic_regression.pkl` e `vetorizador.pkl` — o modelo treinado e o que converte texto em número pra ele entender.
+- `best_score.json` — guarda a melhor nota já alcançada, pra saber se vale a pena trocar o modelo.
+- `feedback_treino.csv` — todos os exemplos que eu já ensinei.
+- `historico_execucoes.log` — log de cada retreino.
+- `HateBR-7.0.0/` — os datasets originais.
