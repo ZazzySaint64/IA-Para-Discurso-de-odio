@@ -10,7 +10,7 @@ Uma IA em treinamento pra detectar se uma frase é discurso de ódio ou não. A 
 
 Modelo atual: TF-IDF + Regressão Logística, validado com 5-fold cross-validation. F1 macro ~0,75 no dataset combinado (HateBR + ToLD-BR).
 
-![Fluxo do projeto](docs/fluxo.svg)
+![Fluxo do projeto](docs/fluxo.svg?v=2)
 
 ## Antes de rodar
 
