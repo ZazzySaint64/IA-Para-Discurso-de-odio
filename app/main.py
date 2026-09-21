@@ -1,25 +1,21 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from app import ml
+from app.config import settings
+from app.limites import limiter
 from app.routers import predicoes
-
-limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # O modelo é carregado uma vez por processo, não a cada request.
-    # Em Task 4 o caminho passa a vir de Settings.
-    from pathlib import Path
-
-    caminho = Path("ml/artefatos/modelo.pkl")
+    caminho = Path(settings.MODELO_PATH)
     if caminho.exists():
         ml.carregar_modelo(caminho)
     yield

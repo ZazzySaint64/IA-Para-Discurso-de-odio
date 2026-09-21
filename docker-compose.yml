@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hatebr
+      POSTGRES_PASSWORD: hatebr
+      POSTGRES_DB: hatebr
+    ports:
+      - "5432:5432"
+    volumes:
+      - dados_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hatebr"]
+      interval: 5s
+      retries: 5
+
+volumes:
+  dados_postgres:

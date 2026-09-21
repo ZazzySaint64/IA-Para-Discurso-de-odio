@@ -32,3 +32,13 @@ def test_predicao_sem_modelo_devolve_503(cliente, monkeypatch):
     monkeypatch.setattr(ml, "prever", indisponivel)
     resposta = cliente.post("/predicoes", json={"texto": "oi"})
     assert resposta.status_code == 503
+
+
+def test_predicao_e_gravada_no_banco(cliente, sessao):
+    from app.models import Predicao
+
+    cliente.post("/predicoes", json={"texto": "eu te odeio"})
+    gravadas = sessao.query(Predicao).all()
+    assert len(gravadas) == 1
+    assert gravadas[0].texto == "eu te odeio"
+    assert gravadas[0].label == 1
