@@ -77,26 +77,32 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        if args.gerar_senha:
-            senha = gerar_senha()
-            mostrar = True
-        else:
-            senha = getpass("Senha (não aparece enquanto você digita): ")
-            mostrar = False
+        usuario = db.scalar(select(Usuario).where(Usuario.email == args.email))
+
+        def obter_senha() -> str:
+            if args.gerar_senha:
+                return gerar_senha()
+            return getpass("Senha (não aparece enquanto você digita): ")
+
+        # None enquanto nenhuma senha for de fato gravada — controla se e o que é
+        # impresso depois, para nunca mostrar uma senha que não foi salva.
+        senha_nova = None
 
         if args.resetar_senha:
-            usuario = resetar_senha(db, args.email, senha)
+            if usuario is None:
+                raise ValueError(f"Não existe usuário com o email {args.email}")
+            senha_nova = obter_senha()
+            usuario = resetar_senha(db, args.email, senha_nova)
             print(f"Senha trocada para {usuario.email}")
+        elif usuario is None:
+            senha_nova = obter_senha()
+            usuario = criar_usuario(db, args.email, senha_nova)
+            print(f"Usuário criado: {usuario.email}")
         else:
-            try:
-                usuario = criar_usuario(db, args.email, senha)
-                print(f"Usuário criado: {usuario.email}")
-            except UsuarioJaExisteError:
-                usuario = db.scalar(select(Usuario).where(Usuario.email == args.email))
-                print(f"Usuário {args.email} já existia, seguindo com ele.")
+            print(f"Usuário {usuario.email} já existe, senha inalterada.")
 
-        if mostrar:
-            print(f"Senha (aparece só esta vez, salve agora): {senha}")
+        if senha_nova is not None and args.gerar_senha:
+            print(f"Senha (aparece só esta vez, salve agora): {senha_nova}")
 
         if args.importar_csv:
             quantos = importar_csv(db, args.importar_csv, usuario.id)

@@ -5,7 +5,7 @@ target-version = "py312"
 # Os scripts legados na raiz saem nas Tasks 9 e 14; reformata-los e ruido.
 # alembic/versions guarda migrations autogeradas: nao vale a pena reformatar
 # a cada `alembic revision --autogenerate`.
-extend-exclude = ["docs", "classificador.py", "painel_treino.py", "dados_treino.py", "retreinar_modelo.py", "testar_modelo.py", "gerar_hash_senha.py", "alembic/versions"]
+extend-exclude = ["docs", "classificador.py", "painel_treino.py", "dados_treino.py", "retreinar_modelo.py", "testar_modelo.py", "alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
