@@ -19,7 +19,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://hatebr:hatebr@db:5432/hatebr
       JWT_SECRET: segredo-de-desenvolvimento-nao-usar-em-producao
-      TREINO_HABILITADO: "true"
+      # O container nunca treina: a imagem não leva os datasets, e treino e inferência
+      # têm perfis de recurso opostos. Para retreinar, rode na máquina:
+      #   python -m ml.treinar
+      TREINO_HABILITADO: "false"
     ports:
       - "8000:8000"
     depends_on:
