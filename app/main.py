@@ -49,6 +49,15 @@ async def erro_de_limite(request: Request, exc: RateLimitExceeded):
     )
 
 
+@app.exception_handler(Exception)
+async def erro_inesperado(request: Request, exc: Exception):
+    """Garante que todo erro tenha o mesmo formato, inclusive os não previstos."""
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Erro interno no servidor"},
+    )
+
+
 @app.get("/health", tags=["infra"])
 def health():
     if not ml.modelo_carregado():

@@ -42,3 +42,36 @@ def test_predicao_e_gravada_no_banco(cliente, sessao):
     assert len(gravadas) == 1
     assert gravadas[0].texto == "eu te odeio"
     assert gravadas[0].label == 1
+
+
+def test_erro_inesperado_mantem_o_formato_detail(sessao, monkeypatch):
+    """Um commit que falha ainda deve devolver {"detail": "<string>"}.
+
+    `TestClient` normal (a fixture `cliente`) relança exceções do servidor em vez de
+    devolver a resposta 500, então este teste monta seu próprio cliente com
+    `raise_server_exceptions=False` — a versão instalada do TestClient (starlette
+    1.6.0, backend httpx) não aceita esse parâmetro por requisição.
+    """
+    from fastapi.testclient import TestClient
+
+    from app import ml
+    from app.database import get_db
+    from app.main import app
+
+    monkeypatch.setattr(ml, "prever", lambda texto: (1, 0.87))
+    monkeypatch.setattr(ml, "modelo_carregado", lambda: True)
+
+    def explode():
+        raise RuntimeError("banco caiu")
+
+    monkeypatch.setattr(sessao, "commit", explode)
+
+    app.dependency_overrides[get_db] = lambda: sessao
+    try:
+        with TestClient(app, raise_server_exceptions=False) as cliente_sem_raise:
+            resposta = cliente_sem_raise.post("/predicoes", json={"texto": "oi"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resposta.status_code == 500
+    assert isinstance(resposta.json()["detail"], str)
