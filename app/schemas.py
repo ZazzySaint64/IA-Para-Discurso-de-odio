@@ -1,9 +1,7 @@
 from datetime import datetime
-from typing import Literal, TypeVar
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-T = TypeVar("T")
 
 
 class PredicaoEntrada(BaseModel):
@@ -49,6 +47,24 @@ class ExemploSaida(BaseModel):
     texto: str
     label: int
     criado_em: datetime
+
+
+class PredicaoRegistro(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    texto: str
+    label: int
+    confianca: float
+    criado_em: datetime
+
+
+class Metricas(BaseModel):
+    total_predicoes: int
+    taxa_odio: float
+    total_exemplos: int
+    f1_modelo: float | None
+    ultimo_treino_em: datetime | None
 
 
 class Pagina[T](BaseModel):

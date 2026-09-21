@@ -75,3 +75,16 @@ def test_erro_inesperado_mantem_o_formato_detail(sessao, monkeypatch):
 
     assert resposta.status_code == 500
     assert isinstance(resposta.json()["detail"], str)
+
+
+def test_listar_predicoes_exige_token(cliente):
+    assert cliente.get("/predicoes").status_code == 401
+
+
+def test_listar_predicoes_pagina(cliente_logado):
+    for i in range(3):
+        cliente_logado.post("/predicoes", json={"texto": f"frase {i}"})
+    resposta = cliente_logado.get("/predicoes?limite=2")
+    assert resposta.status_code == 200
+    assert resposta.json()["total"] == 3
+    assert len(resposta.json()["itens"]) == 2
