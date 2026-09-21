@@ -1,4 +1,9 @@
-from pydantic import BaseModel, Field, field_validator
+from datetime import datetime
+from typing import Literal, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+T = TypeVar("T")
 
 
 class PredicaoEntrada(BaseModel):
@@ -22,3 +27,30 @@ class PredicaoSaida(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class ExemploEntrada(BaseModel):
+    texto: str = Field(min_length=1, max_length=1000)
+    label: Literal[0, 1]
+
+    @field_validator("texto")
+    @classmethod
+    def sem_espaco_sobrando(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("texto não pode ser só espaço em branco")
+        return v
+
+
+class ExemploSaida(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    texto: str
+    label: int
+    criado_em: datetime
+
+
+class Pagina[T](BaseModel):
+    total: int
+    itens: list[T]
