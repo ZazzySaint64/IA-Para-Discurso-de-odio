@@ -231,3 +231,9 @@ feedback_treino.csv
 
 # Config local (caminhos da sua máquina)
 .claude/
+
+.venv/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage

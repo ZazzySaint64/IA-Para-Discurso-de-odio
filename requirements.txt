@@ -1,4 +1,13 @@
-pandas
-scikit-learn
-joblib
-streamlit
+fastapi>=0.115
+uvicorn[standard]>=0.32
+sqlalchemy>=2.0
+alembic>=1.13
+psycopg[binary]>=3.2
+pydantic-settings>=2.5
+python-multipart>=0.0.12
+pyjwt>=2.9
+bcrypt>=4.2
+slowapi>=0.1.9
+joblib>=1.4
+scikit-learn>=1.5
+pandas>=2.2
