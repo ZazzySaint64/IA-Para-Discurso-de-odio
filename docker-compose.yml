@@ -14,5 +14,17 @@ services:
       interval: 5s
       retries: 5
 
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://hatebr:hatebr@db:5432/hatebr
+      JWT_SECRET: segredo-de-desenvolvimento-nao-usar-em-producao
+      TREINO_HABILITADO: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   dados_postgres:
