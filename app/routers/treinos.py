@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
@@ -11,6 +11,22 @@ from app.schemas import TreinoCriado, TreinoSaida
 from app.security import usuario_atual
 
 router = APIRouter(prefix="/treinos", tags=["treinos"])
+
+# Treino que não terminou em uma hora foi morto junto com o processo: nenhum
+# except roda quando o processo leva SIGKILL. Sem isso, um OOM trava todo
+# treino futuro no 409.
+LIMITE_TREINO_TRAVADO = timedelta(hours=1)
+
+
+def _em_utc(momento: datetime) -> datetime:
+    """Normaliza para um datetime ciente de fuso, em UTC.
+
+    A coluna é DateTime(timezone=True), mas o SQLite não guarda fuso de
+    verdade: o valor volta sem tzinfo (Postgres volta com). Sem isto, comparar
+    com datetime.now(UTC) levanta TypeError só no SQLite (visto nos testes),
+    então a normalização tem que rodar em Python, não no WHERE do SQL.
+    """
+    return momento if momento.tzinfo is not None else momento.replace(tzinfo=UTC)
 
 
 def _executar_treino(treino_id: int, db_factory=SessionLocal) -> None:
@@ -74,10 +90,19 @@ def criar_treino(
 
     rodando = db.scalar(select(Treino).where(Treino.status.in_(("pendente", "rodando"))))
     if rodando is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Já existe um treino em andamento (id {rodando.id})",
+        idade = datetime.now(UTC) - _em_utc(rodando.iniciado_em)
+        if idade <= LIMITE_TREINO_TRAVADO:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Já existe um treino em andamento (id {rodando.id})",
+            )
+        rodando.status = "falhou"
+        rodando.erro = (
+            "Treino abandonado: passou de 1h sem terminar, processo "
+            "provavelmente morreu (ex.: OOM) antes de gravar o desfecho."
         )
+        rodando.terminado_em = datetime.now(UTC)
+        db.commit()
 
     treino = Treino(status="pendente")
     db.add(treino)

@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from app.models import Treino
@@ -84,3 +86,27 @@ def test_treino_com_erro_no_meio_ainda_consegue_gravar_falhou(sessao, monkeypatc
     atualizado = sessao.get(Treino, tid)
     assert atualizado.status == "falhou"
     assert atualizado.erro
+
+
+def test_treino_travado_ha_mais_de_uma_hora_libera_novo_treino(
+    cliente_logado, sessao, treino_falso
+):
+    antigo = Treino(status="rodando", iniciado_em=datetime.now(UTC) - timedelta(hours=2))
+    sessao.add(antigo)
+    sessao.commit()
+
+    resposta = cliente_logado.post("/treinos")
+    assert resposta.status_code == 202
+
+    assert antigo.status == "falhou"
+    assert antigo.erro
+
+
+def test_treino_travado_ha_pouco_tempo_ainda_devolve_409(cliente_logado, sessao, treino_falso):
+    recente = Treino(status="rodando", iniciado_em=datetime.now(UTC) - timedelta(minutes=5))
+    sessao.add(recente)
+    sessao.commit()
+
+    resposta = cliente_logado.post("/treinos")
+    assert resposta.status_code == 409
+    assert recente.status == "rodando"

@@ -49,7 +49,7 @@ class Treino(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     status: Mapped[str] = mapped_column(
-        SAEnum(*STATUS_TREINO, name="status_treino", native_enum=False),
+        SAEnum(*STATUS_TREINO, name="status_treino", native_enum=False, create_constraint=True),
         nullable=False,
         default="pendente",
     )

@@ -1,8 +1,8 @@
 """cria tabela treino
 
-Revision ID: 07df382f3c43
+Revision ID: 68c265401469
 Revises: 6bb179001a28
-Create Date: 2026-09-21 17:35:03.271413
+Create Date: 2026-09-21 17:43:59.840215
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "07df382f3c43"
+revision: str = "68c265401469"
 down_revision: str | Sequence[str] | None = "6bb179001a28"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -34,6 +34,7 @@ def upgrade() -> None:
                 "falhou",
                 name="status_treino",
                 native_enum=False,
+                create_constraint=True,
             ),
             nullable=False,
         ),
