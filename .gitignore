@@ -225,6 +225,9 @@ HateBR-7.0.0/
 
 # Gerado pelo treino/retreino — não versionar
 *.pkl
+# O artefato treinado é versionado de propósito: o deploy precisa dele.
+# Os datasets originais continuam fora do repositório.
+!ml/artefatos/modelo.pkl
 best_score.json
 historico_execucoes.log
 feedback_treino.csv
