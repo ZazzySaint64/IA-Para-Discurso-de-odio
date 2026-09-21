@@ -1,0 +1,86 @@
+import pytest
+
+from app.models import Treino
+
+
+@pytest.fixture
+def treino_falso(monkeypatch):
+    """Treinar de verdade leva minutos. O teste verifica o fluxo, não o sklearn."""
+    from app.routers import treinos
+
+    monkeypatch.setattr(
+        treinos,
+        "_executar_treino",
+        lambda treino_id, db_factory: None,
+    )
+
+
+def test_criar_treino_exige_token(cliente):
+    assert cliente.post("/treinos").status_code == 401
+
+
+def test_criar_treino_devolve_202_e_id(cliente_logado, treino_falso):
+    resposta = cliente_logado.post("/treinos")
+    assert resposta.status_code == 202
+    assert "id" in resposta.json()
+
+
+def test_criar_treino_com_um_ja_rodando_devolve_409(cliente_logado, sessao, treino_falso):
+    sessao.add(Treino(status="rodando"))
+    sessao.commit()
+    resposta = cliente_logado.post("/treinos")
+    assert resposta.status_code == 409
+
+
+def test_consultar_treino_inexistente_devolve_404(cliente_logado):
+    assert cliente_logado.get("/treinos/999").status_code == 404
+
+
+def test_consultar_treino_devolve_status(cliente_logado, sessao):
+    treino = Treino(status="concluido", f1_macro=0.75, desvio=0.01, qtd_exemplos=100)
+    sessao.add(treino)
+    sessao.commit()
+    resposta = cliente_logado.get(f"/treinos/{treino.id}")
+    assert resposta.status_code == 200
+    assert resposta.json()["status"] == "concluido"
+    assert resposta.json()["f1_macro"] == 0.75
+
+
+def test_treino_desligado_devolve_503(cliente_logado, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "TREINO_HABILITADO", False)
+    resposta = cliente_logado.post("/treinos")
+    assert resposta.status_code == 503
+    assert "produção" in resposta.json()["detail"].lower()
+
+
+def test_treino_com_erro_no_meio_ainda_consegue_gravar_falhou(sessao, monkeypatch):
+    """Regressão: um erro de banco no meio do treino deixa a sessão suja
+    (flush falhou). Sem um rollback() antes de gravar o registro de erro, o
+    commit do próprio bloco except também falha com PendingRollbackError, e o
+    treino fica preso em "rodando" para sempre, sem nada registrado.
+    """
+    import ml.treinar as ml_treinar
+    from app.models import Usuario
+    from app.routers import treinos
+
+    treino = Treino(status="rodando")
+    sessao.add(treino)
+    sessao.commit()
+    tid = treino.id
+
+    sessao.add(Usuario(email="dup@exemplo.com", senha_hash="a"))
+    sessao.commit()
+
+    def treinar_que_suja_a_sessao(db=None, **kwargs):
+        db.add(Usuario(email="dup@exemplo.com", senha_hash="b"))  # viola unique
+        db.commit()
+
+    monkeypatch.setattr(ml_treinar, "treinar", treinar_que_suja_a_sessao)
+
+    treinos._executar_treino(tid, lambda: sessao)
+
+    atualizado = sessao.get(Treino, tid)
+    assert atualizado.status == "falhou"
+    assert atualizado.erro

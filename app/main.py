@@ -9,7 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from app import ml
 from app.config import settings
 from app.limites import limiter
-from app.routers import auth, exemplos, metricas, predicoes
+from app.routers import auth, exemplos, metricas, predicoes, treinos
 
 
 @asynccontextmanager
@@ -69,3 +69,4 @@ app.include_router(auth.router)
 app.include_router(exemplos.router)
 app.include_router(metricas.router)
 app.include_router(predicoes.router)
+app.include_router(treinos.router)

@@ -70,3 +70,21 @@ class Metricas(BaseModel):
 class Pagina[T](BaseModel):
     total: int
     itens: list[T]
+
+
+class TreinoCriado(BaseModel):
+    id: int
+    status: str
+
+
+class TreinoSaida(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    status: str
+    f1_macro: float | None
+    desvio: float | None
+    qtd_exemplos: int | None
+    erro: str | None
+    iniciado_em: datetime
+    terminado_em: datetime | None

@@ -1,9 +1,12 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+
+STATUS_TREINO = ("pendente", "rodando", "concluido", "falhou")
 
 
 class Predicao(Base):
@@ -39,3 +42,23 @@ class Usuario(Base):
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class Treino(Base):
+    __tablename__ = "treino"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    status: Mapped[str] = mapped_column(
+        SAEnum(*STATUS_TREINO, name="status_treino", native_enum=False),
+        nullable=False,
+        default="pendente",
+    )
+    f1_macro: Mapped[float | None] = mapped_column(Float, nullable=True)
+    desvio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    seed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    qtd_exemplos: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    erro: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    iniciado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    terminado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
