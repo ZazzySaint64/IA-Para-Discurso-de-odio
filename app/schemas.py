@@ -17,3 +17,8 @@ class PredicaoSaida(BaseModel):
     label: int
     rotulo: str
     confianca: float
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
