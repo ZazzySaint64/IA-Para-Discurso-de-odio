@@ -42,9 +42,9 @@ def criar_token(usuario_id: int) -> str:
 def ler_token(token: str) -> int | None:
     try:
         dados = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
-    except jwt.PyJWTError:
+        return int(dados["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError):
         return None
-    return int(dados["sub"])
 
 
 def usuario_atual(token: str = Depends(oauth2), db: Session = Depends(get_db)) -> Usuario:

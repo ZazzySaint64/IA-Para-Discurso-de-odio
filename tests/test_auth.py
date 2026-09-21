@@ -1,4 +1,7 @@
+import jwt
+
 from app import security
+from app.config import settings
 
 
 def test_hash_nao_guarda_a_senha_em_texto():
@@ -45,6 +48,30 @@ def test_login_com_email_inexistente(cliente):
         "/auth/login", data={"username": "ninguem@exemplo.com", "password": "x"}
     )
     assert resposta.status_code == 401
+
+
+def test_login_com_email_inexistente_ainda_confere_hash(cliente, monkeypatch):
+    """Sem isso, o login responde rápido demais para email inexistente e
+    permite enumerar quais emails estão cadastrados."""
+    chamadas = []
+    original = security.conferir_senha
+
+    def espiao(senha, hash_):
+        chamadas.append(hash_)
+        return original(senha, hash_)
+
+    monkeypatch.setattr(security, "conferir_senha", espiao)
+    resposta = cliente.post(
+        "/auth/login", data={"username": "ninguem@exemplo.com", "password": "x"}
+    )
+    assert resposta.status_code == 401
+    assert len(chamadas) == 1
+
+
+def test_token_com_sub_invalido_devolve_none():
+    """Token assinado corretamente, mas com 'sub' que não é um id: falha fechada."""
+    token = jwt.encode({"sub": "nao-e-numero"}, settings.JWT_SECRET, algorithm="HS256")
+    assert security.ler_token(token) is None
 
 
 def test_gerar_hash_rejeita_senha_maior_que_72_bytes():
