@@ -17,15 +17,11 @@ Swagger (documentação interativa, com botão **Authorize**): `<url-acima>/docs
 
 O plano gratuito do Render hiberna o serviço depois de 15 minutos sem uso. Se o link estiver "dormindo", a primeira requisição demora cerca de 50 segundos pra acordar o container — as seguintes voltam ao normal.
 
-![Swagger com o botão Authorize](docs/swagger.jpg)
-
 ## O que é
 
 Uma API que classifica um comentário em português como discurso de ódio ou não. O modelo é TF-IDF + Regressão Logística, validado com 5-fold cross-validation, F1 macro ≈ 0,75 no dataset combinado (HateBR + ToLD-BR). O domínio (classificação de texto) não é o foco do projeto — o foco é a engenharia em volta dele: API REST documentada, banco relacional, autenticação, testes, CI e deploy.
 
 Existe uma rota pública para classificar texto e consultar métricas, e rotas autenticadas por JWT para quem treina o modelo: registrar exemplos rotulados e disparar um retreino. O Streamlit em `frontend/` é só um cliente HTTP dessa API, sem lógica própria — a mesma separação que motivou reescrever o projeto.
-
-![Painel de treino do Streamlit, tela de login](docs/streamlit_painel_treino.jpg)
 
 ## Arquitetura
 

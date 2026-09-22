@@ -1,13 +1,17 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from app import ml
 from app.config import settings
+from app.database import get_db
 from app.limites import limiter
 from app.routers import auth, exemplos, metricas, predicoes, treinos
 
@@ -59,10 +63,14 @@ async def erro_inesperado(request: Request, exc: Exception):
 
 
 @app.get("/health", tags=["infra"])
-def health():
+def health(db: Session = Depends(get_db)):
     if not ml.modelo_carregado():
         return JSONResponse(status_code=503, content={"detail": "Modelo não carregado"})
-    return {"status": "ok", "modelo": True}
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        return JSONResponse(status_code=503, content={"detail": "Banco de dados indisponível"})
+    return {"status": "ok", "modelo": True, "banco": True}
 
 
 app.include_router(auth.router)
