@@ -33,3 +33,26 @@ def test_listar_exemplos_pagina(cliente_logado):
 
 def test_listar_exemplos_exige_token(cliente):
     assert cliente.get("/exemplos").status_code == 401
+
+
+def test_exemplo_duplicado_concorrente_vira_409_e_nao_500(cliente_logado, sessao, monkeypatch):
+    """Duas requisições simultâneas passam pela pré-checagem juntas; a perdedora
+    bate na UNIQUE do banco. Sem tratar, o handler global devolve 500 justamente
+    no caso em que a API promete 409.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    commit_real = sessao.commit
+    explodiu = []
+
+    def commit_que_falha_uma_vez():
+        if not explodiu:
+            explodiu.append(True)
+            raise IntegrityError("INSERT", {}, Exception("UNIQUE constraint failed"))
+        return commit_real()
+
+    monkeypatch.setattr(sessao, "commit", commit_que_falha_uma_vez)
+
+    resposta = cliente_logado.post("/exemplos", json={"texto": "te odeio", "label": 1})
+    assert resposta.status_code == 409
+    assert "já" in resposta.json()["detail"].lower()

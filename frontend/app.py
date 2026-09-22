@@ -70,11 +70,17 @@ with aba_treino:
             senha = st.text_input("Senha", type="password")
             if st.form_submit_button("Entrar"):
                 resposta = pedir("POST", "/auth/login", data={"username": email, "password": senha})
-                if resposta is not None and resposta.status_code == 200:
+                if resposta is None:
+                    pass
+                elif resposta.status_code == 200:
                     st.session_state.token = resposta.json()["access_token"]
                     st.rerun()
-                else:
+                elif resposta.status_code == 401:
                     st.error("Email ou senha incorretos.")
+                else:
+                    # Um 500 ou um 429 não são senha errada; dizer que são
+                    # manda o usuário caçar o problema no lugar errado.
+                    st.error(detalhe(resposta))
     else:
         cabecalho = {"Authorization": f"Bearer {st.session_state.token}"}
 

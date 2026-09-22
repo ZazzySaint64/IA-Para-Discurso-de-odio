@@ -1,19 +1,22 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+
+
+def sem_espaco_sobrando(v: str) -> str:
+    v = v.strip()
+    if not v:
+        raise ValueError("texto não pode ser só espaço em branco")
+    return v
+
+
+# Mesma regra em /predicoes e /exemplos: um alias em vez de duas cópias.
+Texto = Annotated[str, Field(min_length=1, max_length=1000), AfterValidator(sem_espaco_sobrando)]
 
 
 class PredicaoEntrada(BaseModel):
-    texto: str = Field(min_length=1, max_length=1000)
-
-    @field_validator("texto")
-    @classmethod
-    def sem_espaco_sobrando(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("texto não pode ser só espaço em branco")
-        return v
+    texto: Texto
 
 
 class PredicaoSaida(BaseModel):
@@ -28,16 +31,8 @@ class Token(BaseModel):
 
 
 class ExemploEntrada(BaseModel):
-    texto: str = Field(min_length=1, max_length=1000)
+    texto: Texto
     label: Literal[0, 1]
-
-    @field_validator("texto")
-    @classmethod
-    def sem_espaco_sobrando(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("texto não pode ser só espaço em branco")
-        return v
 
 
 class ExemploSaida(BaseModel):

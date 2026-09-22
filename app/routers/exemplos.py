@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -8,6 +9,8 @@ from app.schemas import ExemploEntrada, ExemploSaida, Pagina
 from app.security import usuario_atual
 
 router = APIRouter(prefix="/exemplos", tags=["exemplos"])
+
+JA_ENSINADO = "Esse texto já foi ensinado ao modelo"
 
 
 @router.post("", response_model=ExemploSaida, status_code=status.HTTP_201_CREATED)
@@ -18,13 +21,16 @@ def criar_exemplo(
 ) -> Exemplo:
     existente = db.scalar(select(Exemplo).where(Exemplo.texto == entrada.texto))
     if existente is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Esse texto já foi ensinado ao modelo",
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=JA_ENSINADO)
     exemplo = Exemplo(texto=entrada.texto, label=entrada.label, usuario_id=usuario.id)
     db.add(exemplo)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A checagem acima é só um atalho: duas requisições simultâneas passam
+        # por ela juntas e a perdedora bate na UNIQUE. Quem manda é o banco.
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=JA_ENSINADO) from None
     return exemplo
 
 
