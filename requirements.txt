@@ -9,5 +9,7 @@ pyjwt>=2.9
 bcrypt>=4.2
 slowapi>=0.1.9
 joblib>=1.4
-scikit-learn>=1.5
+# O modelo.pkl versionado foi gerado com 1.9.1: unpickle é sensível à versão,
+# e o teto evita que um bump do Dependabot quebre o deploy no lifespan.
+scikit-learn>=1.9,<1.10
 pandas>=2.2

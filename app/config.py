@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     DATABASE_URL: str = "postgresql+psycopg://hatebr:hatebr@localhost:5432/hatebr"
-    JWT_SECRET: str = "chave-de-desenvolvimento-nao-usar-em-producao"
+    # Sem default de propósito: este repositório é público, e um default
+    # conhecido passaria pelo validador de tamanho abaixo sem proteger nada.
+    JWT_SECRET: str
     JWT_EXPIRA_MINUTOS: int = 60
     MODELO_PATH: str = "ml/artefatos/modelo.pkl"
     TREINO_HABILITADO: bool = True

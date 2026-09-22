@@ -43,3 +43,21 @@ def test_modelo_carregado_reflete_o_estado(caminho_modelo):
     assert ml.modelo_carregado() is False
     ml.carregar_modelo(caminho_modelo)
     assert ml.modelo_carregado() is True
+
+
+def test_artefato_versionado_carrega_e_preve():
+    """O .pkl commitado é o único arquivo sem o qual o serviço não sobe, e o
+    unpickle é sensível à versão do scikit-learn. Sem este teste, um bump do
+    Dependabot só apareceria como deploy quebrado no Render.
+    """
+    from pathlib import Path
+
+    from app.config import settings
+
+    try:
+        ml.carregar_modelo(Path(settings.MODELO_PATH))
+        label, confianca = ml.prever("oi")
+        assert label in (0, 1)
+        assert 0.0 <= confianca <= 1.0
+    finally:
+        ml._pipeline = None

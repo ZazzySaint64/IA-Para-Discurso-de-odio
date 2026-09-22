@@ -1,6 +1,7 @@
 import os
 
 os.environ["RATE_LIMIT_ATIVO"] = "false"
+os.environ["JWT_SECRET"] = "segredo-de-teste-com-mais-de-32-bytes-de-tamanho"
 
 import pytest
 from fastapi.testclient import TestClient

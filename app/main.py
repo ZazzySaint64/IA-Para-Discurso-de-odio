@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from app.database import get_db
 from app.limites import limiter
 from app.routers import auth, exemplos, metricas, predicoes, treinos
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,6 +26,10 @@ async def lifespan(app: FastAPI):
     caminho = Path(settings.MODELO_PATH)
     if caminho.exists():
         ml.carregar_modelo(caminho)
+        logger.info("Modelo carregado de %s", caminho)
+    else:
+        # Sem log, isto aparece só como health check falhando, sem dizer por quê.
+        logger.error("Modelo não encontrado em %s: /health vai responder 503", caminho)
     yield
 
 
@@ -39,9 +47,12 @@ async def erro_de_validacao(request: Request, exc: RequestValidationError):
     """Padroniza o 422 do Pydantic no mesmo formato dos outros erros."""
     primeiro = exc.errors()[0]
     campo = ".".join(str(p) for p in primeiro["loc"] if p != "body")
+    # loc == ("body",) quando o corpo inteiro tem o tipo errado: sem nome de
+    # campo, o prefixo viraria um ":" solto na frente da mensagem.
+    detalhe = f"{campo}: {primeiro['msg']}" if campo else primeiro["msg"]
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        content={"detail": f"{campo}: {primeiro['msg']}"},
+        content={"detail": detalhe},
     )
 
 
@@ -50,6 +61,7 @@ async def erro_de_limite(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         content={"detail": "Muitas requisições. Tente de novo em instantes."},
+        headers={"Retry-After": str(exc.limit.limit.get_expiry())},
     )
 
 

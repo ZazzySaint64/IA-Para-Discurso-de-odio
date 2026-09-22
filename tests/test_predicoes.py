@@ -88,3 +88,12 @@ def test_listar_predicoes_pagina(cliente_logado):
     assert resposta.status_code == 200
     assert resposta.json()["total"] == 3
     assert len(resposta.json()["itens"]) == 2
+
+
+def test_corpo_que_nao_e_objeto_nao_devolve_detail_comecando_com_dois_pontos(cliente):
+    """`loc` == ("body",): não há nome de campo, então o prefixo tem que sumir."""
+    resposta = cliente.post("/predicoes", json=["isto não é um objeto"])
+    assert resposta.status_code == 422
+    detalhe = resposta.json()["detail"]
+    assert not detalhe.startswith(":")
+    assert detalhe.strip() == detalhe
