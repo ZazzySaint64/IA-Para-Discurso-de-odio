@@ -80,6 +80,7 @@ class TreinoSaida(BaseModel):
     f1_macro: float | None
     desvio: float | None
     qtd_exemplos: int | None
+    substituiu: bool | None
     erro: str | None
     iniciado_em: datetime
     terminado_em: datetime | None

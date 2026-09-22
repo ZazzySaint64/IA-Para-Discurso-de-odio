@@ -75,6 +75,7 @@ def _executar_treino(treino_id: int, db_factory=SessionLocal) -> None:
         treino.desvio = resultado["desvio"]
         treino.seed = resultado["seed"]
         treino.qtd_exemplos = resultado["qtd_exemplos"]
+        treino.substituiu = resultado["substituiu"]
         treino.terminado_em = datetime.now(UTC)
         db.commit()
     except Exception as exc:  # noqa: BLE001 - o erro precisa virar registro, não sumir

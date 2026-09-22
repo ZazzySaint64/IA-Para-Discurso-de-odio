@@ -157,7 +157,20 @@ def test_treino_recarrega_o_modelo_so_quando_o_artefato_muda(
 
     treinos._executar_treino(treino.id, lambda: sessao)
 
-    assert sessao.get(Treino, treino.id).status == "concluido"
+    atualizado = sessao.get(Treino, treino.id)
+    assert atualizado.status == "concluido"
+    assert atualizado.substituiu is substituiu
     assert len(recarregados) == chamadas_esperadas
     if chamadas_esperadas:
         assert Path(recarregados[0]) == artefato
+
+
+def test_consultar_treino_expoe_substituiu(cliente_logado, sessao):
+    """O painel precisa distinguir "melhorou" de "manteve" sem adivinhar
+    pelo F1: o front compara o F1 antes/depois, mas só este campo diz se o
+    artefato em disco realmente mudou."""
+    treino = Treino(status="concluido", f1_macro=0.75, substituiu=False)
+    sessao.add(treino)
+    sessao.commit()
+    resposta = cliente_logado.get(f"/treinos/{treino.id}")
+    assert resposta.json()["substituiu"] is False
