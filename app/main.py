@@ -36,7 +36,7 @@ async def erro_de_validacao(request: Request, exc: RequestValidationError):
     primeiro = exc.errors()[0]
     campo = ".".join(str(p) for p in primeiro["loc"] if p != "body")
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={"detail": f"{campo}: {primeiro['msg']}"},
     )
 

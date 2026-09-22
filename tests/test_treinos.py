@@ -54,7 +54,7 @@ def test_treino_desligado_devolve_503(cliente_logado, monkeypatch):
     monkeypatch.setattr(settings, "TREINO_HABILITADO", False)
     resposta = cliente_logado.post("/treinos")
     assert resposta.status_code == 503
-    assert "produção" in resposta.json()["detail"].lower()
+    assert "desligado" in resposta.json()["detail"].lower()
 
 
 def test_treino_com_erro_no_meio_ainda_consegue_gravar_falhou(sessao, monkeypatch):

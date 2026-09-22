@@ -82,9 +82,10 @@ def criar_treino(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Retreino desligado em produção: o plano gratuito tem 512 MB de RAM, "
-                "insuficiente para validação cruzada. Rode localmente com "
-                "`python -m ml.treinar`."
+                "Retreino desligado nesta API: em produção o plano gratuito tem 512 MB "
+                "de RAM, insuficiente para validação cruzada; localmente (docker "
+                "compose) a imagem não leva os datasets, e o treino roda fora do "
+                "processo da API por design. Rode com `python -m ml.treinar`."
             ),
         )
 
