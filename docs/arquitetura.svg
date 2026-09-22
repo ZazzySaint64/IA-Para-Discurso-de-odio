@@ -1,0 +1,96 @@
+<svg viewBox="0 0 820 350" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <title>Arquitetura do HateBR API</title>
+  <desc>
+    Streamlit fala HTTP com a FastAPI, que le e escreve no Postgres e so le o
+    modelo.pkl. O ml/treinar.py roda fora do processo da API, le os exemplos
+    no Postgres e escreve o modelo.pkl.
+  </desc>
+
+  <style>
+    :root {
+      --fill: #f3f4f6;
+      --stroke: #374151;
+      --text: #111827;
+      --muted: #4b5563;
+      --arrow: #374151;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fill: #1f2937;
+        --stroke: #9ca3af;
+        --text: #f3f4f6;
+        --muted: #d1d5db;
+        --arrow: #9ca3af;
+      }
+    }
+    .caixa { fill: var(--fill); stroke: var(--stroke); stroke-width: 1.5; }
+    .caixa-externa { fill: var(--fill); stroke: var(--stroke); stroke-width: 1.5; stroke-dasharray: 5,3; }
+    .titulo { fill: var(--text); font-size: 15px; font-weight: 600; text-anchor: middle; }
+    .sub { fill: var(--muted); font-size: 11.5px; text-anchor: middle; }
+    .rotulo { fill: var(--muted); font-size: 12px; text-anchor: middle; }
+    .nota { fill: var(--muted); font-size: 12px; text-anchor: middle; }
+    .seta-escreve { stroke: var(--arrow); stroke-width: 2; fill: none; }
+    .seta-le { stroke: var(--arrow); stroke-width: 2; fill: none; stroke-dasharray: 6,4; }
+    .ponta { fill: var(--arrow); }
+  </style>
+
+  <defs>
+    <marker id="ponta" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path class="ponta" d="M0,0 L7,3 L0,6 Z" />
+    </marker>
+  </defs>
+
+  <!-- Streamlit -->
+  <rect class="caixa" x="20" y="100" width="150" height="70" rx="10" />
+  <text class="titulo" x="95" y="130">Streamlit</text>
+  <text class="sub" x="95" y="150">frontend/app.py</text>
+
+  <!-- FastAPI -->
+  <rect class="caixa" x="260" y="100" width="150" height="70" rx="10" />
+  <text class="titulo" x="335" y="130">FastAPI</text>
+  <text class="sub" x="335" y="150">app/</text>
+
+  <!-- Postgres -->
+  <rect class="caixa" x="500" y="100" width="150" height="70" rx="10" />
+  <text class="titulo" x="575" y="130">Postgres</text>
+  <text class="sub" x="575" y="150">usuario, predicao,</text>
+  <text class="sub" x="575" y="163">exemplo, treino</text>
+
+  <!-- modelo.pkl (artefato) -->
+  <rect class="caixa-externa" x="260" y="245" width="150" height="60" rx="10" />
+  <text class="titulo" x="335" y="272">modelo.pkl</text>
+  <text class="sub" x="335" y="290">artefato treinado</text>
+
+  <!-- ml/treinar.py (processo externo) -->
+  <rect class="caixa-externa" x="500" y="245" width="150" height="60" rx="10" />
+  <text class="titulo" x="575" y="272">ml/treinar.py</text>
+  <text class="sub" x="575" y="290">fora do processo da API</text>
+
+  <!-- Streamlit -> FastAPI -->
+  <path class="seta-escreve" marker-end="url(#ponta)" d="M170,135 L258,135" />
+  <text class="rotulo" x="215" y="123">HTTP</text>
+
+  <!-- FastAPI -> Postgres -->
+  <path class="seta-escreve" marker-end="url(#ponta)" d="M410,135 L498,135" />
+  <text class="rotulo" x="455" y="123">SQL</text>
+
+  <!-- FastAPI -> modelo.pkl (so le) -->
+  <path class="seta-le" marker-end="url(#ponta)" d="M335,172 L335,243" />
+  <text class="rotulo" x="393" y="212">lê (só lê)</text>
+
+  <!-- ml/treinar.py -> modelo.pkl (escreve) -->
+  <path class="seta-escreve" marker-end="url(#ponta)" d="M498,275 L412,275" />
+  <text class="rotulo" x="455" y="263">escreve</text>
+
+  <!-- ml/treinar.py -> Postgres (le exemplos) -->
+  <path class="seta-le" marker-end="url(#ponta)" d="M590,243 L590,172" />
+  <text class="rotulo" x="645" y="212">lê exemplos</text>
+
+  <!-- legenda -->
+  <line x1="20" y1="325" x2="55" y2="325" class="seta-escreve" />
+  <text class="nota" x="125" y="329">seta cheia = escreve</text>
+  <line x1="250" y1="325" x2="285" y2="325" class="seta-le" />
+  <text class="nota" x="360" y="329">seta tracejada = só lê</text>
+
+  <text class="nota" x="500" y="329">app/ nunca importa ml/</text>
+</svg>
