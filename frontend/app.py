@@ -5,6 +5,7 @@ com a API. Foi exatamente essa separação que motivou o redesenho do projeto.
 """
 
 import os
+import time
 
 import requests
 import streamlit as st
@@ -108,11 +109,63 @@ with aba_treino:
                     st.error(detalhe(resposta))
 
         if st.button("Atualizar modelo agora"):
+            # F1 "de antes" vem daqui, não do resultado do treino: se ele mantiver o
+            # modelo, o que está no ar continua sendo este número.
+            antes = pedir("GET", "/metricas")
+            f1_antes = None
+            if antes is not None and antes.status_code == 200:
+                f1_antes = antes.json()["f1_modelo"]
+
             resposta = pedir("POST", "/treinos", headers=cabecalho)
             if resposta is None:
                 pass
             elif resposta.status_code == 202:
-                st.info(f"Treino iniciado (id {resposta.json()['id']}).")
+                treino_id = resposta.json()["id"]
+                final = None
+                # Uma rodada real leva ~7s nesta máquina; o teto de 60s é só uma rede de
+                # segurança para não travar o painel se algo emperrar.
+                with st.status("Treinando o modelo...", expanded=True) as status:
+                    inicio = time.time()
+                    while time.time() - inicio < 60:
+                        acompanha = pedir("GET", f"/treinos/{treino_id}", headers=cabecalho)
+                        if acompanha is None:
+                            break
+                        if acompanha.status_code == 401:
+                            st.session_state.token = None
+                            st.warning("Sessão expirada, entre de novo.")
+                            st.rerun()
+                        if acompanha.status_code != 200:
+                            st.warning(detalhe(acompanha))
+                            break
+                        dado = acompanha.json()
+                        if dado["status"] in ("concluido", "falhou"):
+                            final = dado
+                            status.update(
+                                label="Treino concluído"
+                                if dado["status"] == "concluido"
+                                else "Treino falhou",
+                                state="complete" if dado["status"] == "concluido" else "error",
+                            )
+                            break
+                        time.sleep(2)
+
+                if final is None:
+                    st.info(
+                        f"Ainda está treinando depois de 1 minuto de espera — isso é raro. "
+                        f"Confira o resultado daqui a pouco, é o treino de id {treino_id}."
+                    )
+                elif final["status"] == "falhou":
+                    st.error(f"O treino falhou: {final['erro']}")
+                elif final["substituiu"]:
+                    st.success(f"Modelo atualizado! O novo F1 é {final['f1_macro']:.3f}.")
+                else:
+                    texto_antes = f"{f1_antes:.3f}" if f1_antes is not None else "—"
+                    st.info(
+                        f"O treino terminou, mas mantive o modelo que já estava no ar: esta "
+                        f"rodada chegou a F1 {final['f1_macro']:.3f}, contra {texto_antes} do "
+                        f"modelo atual. Isso é normal — o resultado varia um pouco a cada "
+                        f"rodada, e só troco o modelo quando o novo realmente é melhor."
+                    )
             else:
                 st.warning(detalhe(resposta))
 
