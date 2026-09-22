@@ -1,14 +1,19 @@
+import logging
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import ml
 from app.config import settings
 from app.database import SessionLocal, get_db
 from app.models import Treino, Usuario
 from app.schemas import TreinoCriado, TreinoSaida
 from app.security import usuario_atual
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/treinos", tags=["treinos"])
 
@@ -43,6 +48,7 @@ def _executar_treino(treino_id: int, db_factory=SessionLocal) -> None:
         treino = db.get(Treino, treino_id)
         treino.status = "rodando"
         db.commit()
+        logger.info("Treino %s iniciado", treino_id)
 
         melhor = db.scalar(
             select(Treino.f1_macro)
@@ -51,6 +57,18 @@ def _executar_treino(treino_id: int, db_factory=SessionLocal) -> None:
             .limit(1)
         )
         resultado = treinar(db=db, f1_atual=melhor)
+        logger.info(
+            "Treino %s terminou: f1_macro=%.4f, artefato %s",
+            treino_id,
+            resultado["f1_macro"],
+            "substituído" if resultado["substituiu"] else "mantido",
+        )
+
+        # Sem isto a API segue servindo o pipeline carregado no lifespan, ou
+        # seja, o modelo antigo, até o processo reiniciar. Religar a global do
+        # módulo é atômico no CPython: não precisa de lock.
+        if resultado["substituiu"]:
+            ml.carregar_modelo(Path(settings.MODELO_PATH))
 
         treino.status = "concluido"
         treino.f1_macro = resultado["f1_macro"]
@@ -62,6 +80,7 @@ def _executar_treino(treino_id: int, db_factory=SessionLocal) -> None:
     except Exception as exc:  # noqa: BLE001 - o erro precisa virar registro, não sumir
         # Se o erro veio de um flush/commit (ex.: leitura dos exemplos), a sessão
         # fica suja e nem o commit abaixo funcionaria sem isto primeiro.
+        logger.error("Treino %s falhou: %s", treino_id, exc)
         db.rollback()
         treino = db.get(Treino, treino_id)
         treino.status = "falhou"

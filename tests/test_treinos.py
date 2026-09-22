@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -110,3 +111,53 @@ def test_treino_travado_ha_pouco_tempo_ainda_devolve_409(cliente_logado, sessao,
     resposta = cliente_logado.post("/treinos")
     assert resposta.status_code == 409
     assert recente.status == "rodando"
+
+
+@pytest.mark.parametrize("substituiu, chamadas_esperadas", [(True, 1), (False, 0)])
+def test_treino_recarrega_o_modelo_so_quando_o_artefato_muda(
+    sessao, monkeypatch, tmp_path, substituiu, chamadas_esperadas
+):
+    """Sem recarregar, a API segue respondendo com o .pkl antigo até reiniciar.
+
+    O treino é falso de propósito: o que está sendo testado é a religação do
+    pipeline, não o sklearn.
+    """
+    import joblib
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
+
+    import ml.treinar as ml_treinar
+    from app.config import settings
+    from app.routers import treinos
+
+    artefato = tmp_path / "modelo.pkl"
+    pipeline = Pipeline([("tfidf", TfidfVectorizer()), ("clf", LogisticRegression())])
+    pipeline.fit(["eu te odeio", "bom dia"], [1, 0])
+    joblib.dump(pipeline, artefato)
+    monkeypatch.setattr(settings, "MODELO_PATH", str(artefato))
+
+    def treinar_falso(db=None, **kwargs):
+        return {
+            "f1_macro": 0.8,
+            "desvio": 0.01,
+            "seed": 1,
+            "qtd_exemplos": 10,
+            "substituiu": substituiu,
+        }
+
+    monkeypatch.setattr(ml_treinar, "treinar", treinar_falso)
+
+    recarregados = []
+    monkeypatch.setattr(treinos.ml, "carregar_modelo", recarregados.append)
+
+    treino = Treino(status="pendente")
+    sessao.add(treino)
+    sessao.commit()
+
+    treinos._executar_treino(treino.id, lambda: sessao)
+
+    assert sessao.get(Treino, treino.id).status == "concluido"
+    assert len(recarregados) == chamadas_esperadas
+    if chamadas_esperadas:
+        assert Path(recarregados[0]) == artefato
