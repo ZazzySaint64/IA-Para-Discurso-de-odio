@@ -55,6 +55,29 @@ alembic/      migrations
 
 ## Como rodar
 
+A forma mais direta, sem Docker — clona, instala as dependências (API + frontend) e roda um único script que sobe tudo:
+
+```bash
+git clone https://github.com/ZazzySaint64/IA-Para-Discurso-de-dio.git
+cd IA-Para-Discurso-de-dio
+pip install -r requirements.txt -r frontend/requirements.txt
+python main.py
+```
+
+`python main.py`: cria o `.env` se ele ainda não existir (gera um `JWT_SECRET` novo, aponta pra um SQLite local em `dev.db`) e não mexe nele se já existir; roda `alembic upgrade head`; sobe a API em `localhost:8000` e o Streamlit em `localhost:8501`, espera os dois responderem de verdade (`/health` sendo consultado em loop, não um sleep chutado) e abre o navegador. **Ctrl+C encerra os dois processos.** Se nenhum usuário existir ainda, ele avisa e imprime o comando de seed abaixo — a aba de treino do Streamlit não consegue logar sem um. As portas 8000 e 8501 precisam estar livres; se alguma estiver ocupada, o script diz qual e sai, sem procurar outra.
+
+Criar o usuário que treina o modelo (a senha aparece uma vez no terminal, salva num gerenciador de senhas):
+
+```bash
+python -m app.seed --gerar-senha
+```
+
+Este caminho existe porque o anterior — dois terminais, um `cp` e um `printf` — pedia comandos em bash mesmo quando quem lia estava no PowerShell, onde `printf` nem existe.
+
+### Rodar as peças separadas
+
+`main.py` só automatiza os comandos abaixo. Use-os direto para rodar via Docker — o único caminho com Postgres de verdade, o que `docker-compose.yml` e o CI usam — ou para depurar uma peça isolada.
+
 Pré-requisito: Docker e Docker Compose. Os comandos que dependem de Docker **não foram executados nesta máquina** (sem Docker instalado aqui) — `pytest` e `ruff`, mais abaixo, foram, de verdade, nesta mesma máquina.
 
 ```bash
@@ -63,7 +86,7 @@ cd IA-Para-Discurso-de-dio
 cp .env.exemplo .env
 ```
 
-O `cp` vem antes de tudo porque `JWT_SECRET` não tem valor padrão — de propósito: um default num repositório público seria um segredo que qualquer pessoa lê, então a aplicação prefere recusar-se a subir a fingir que está protegida. Consequência prática: **todo comando que roda Python direto na máquina** (`python -m ml.treinar`, `python -m app.seed`) aborta na hora sem um `.env`. Pelo `docker compose` não faz falta, porque o `docker-compose.yml` já define as variáveis. O `.env` está no `.gitignore`, e o valor que vem no exemplo serve só para desenvolvimento local — em produção quem gera o segredo é o Render (`generateValue: true` no `render.yaml`).
+O `cp` vem antes de tudo porque `JWT_SECRET` não tem valor padrão — de propósito: um default num repositório público seria um segredo que qualquer pessoa lê, então a aplicação prefere recusar-se a subir a fingir que está protegida. Consequência prática: **todo comando que roda Python direto na máquina** (`python -m ml.treinar`, `python -m app.seed`) aborta na hora sem um `.env` (o `main.py` do caminho acima cria o dele sozinho; este `cp` é a versão manual da mesma necessidade). Pelo `docker compose` não faz falta, porque o `docker-compose.yml` já define as variáveis. O `.env` está no `.gitignore`, e o valor que vem no exemplo serve só para desenvolvimento local — em produção quem gera o segredo é o Render (`generateValue: true` no `render.yaml`).
 
 ```bash
 docker compose up --build
@@ -93,7 +116,7 @@ pip install -r requirements-dev.txt
 pytest --cov=app --cov-report=term-missing
 ```
 
-70 testes, cobertura de 96% em `app/`.
+71 testes, cobertura de 96% em `app/`.
 
 ## Como colocar no ar
 
