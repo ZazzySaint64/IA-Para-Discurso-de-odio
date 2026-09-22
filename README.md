@@ -27,7 +27,9 @@ Existe uma rota pública para classificar texto e consultar métricas, e rotas a
 
 ![Arquitetura](docs/arquitetura.svg)
 
-Regra central: **`app/` nunca importa `ml/`** — a API só lê o artefato treinado (`ml/artefatos/modelo.pkl`); quem treina é um processo separado, porque inferência e treino têm perfis de recurso opostos e essa separação é o que permite rodar a API em um plano gratuito de 512 MB.
+Regra central: **`app/` não tem nenhuma dependência de `ml/` em tempo de import** — nenhum módulo da API importa o pacote de treino; ela só lê o artefato treinado (`ml/artefatos/modelo.pkl`). (O scikit-learn ainda entra no processo, mas pelo `joblib.load` que desserializa o pipeline, não pelo código de treino.) O único acoplamento é um `from ml.treinar import treinar` adiado dentro de `_executar_treino` (`app/routers/treinos.py`), que só executa quando alguém pede um retreino — e essa rota devolve `503` em produção e no `docker compose`, onde `TREINO_HABILITADO=false`. Na prática, portanto, treino e inferência são processos separados: os perfis de recurso são opostos, e é essa separação que permite rodar a API em um plano gratuito de 512 MB.
+
+A regra não é só uma promessa no README: `tests/test_arquitetura.py` percorre todo `.py` sob `app/` com `ast` e falha se alguém içar esse import para o topo de um módulo.
 
 ```
 app/          FastAPI: rotas, auth, banco, carregamento do modelo
@@ -85,7 +87,7 @@ pip install -r requirements-dev.txt
 pytest --cov=app --cov-report=term-missing
 ```
 
-61 testes, cobertura de 94% em `app/`.
+70 testes, cobertura de 96% em `app/`.
 
 ## Como colocar no ar
 
@@ -116,7 +118,7 @@ O deploy é via [Render](https://render.com) Blueprint, lendo o `render.yaml` j�
 - **Fila de tarefas (Celery, Redis, RQ).** `BackgroundTasks` do FastAPI resolve o caso de um único usuário treinando o modelo; fila seria complexidade sem demanda.
 - **Troca do modelo por transformers (BERTimbau).** O ganho seria de domínio (melhor F1), não de engenharia, e o modelo não cabe em 512 MB de RAM.
 - **Cadastro público de usuários, recuperação de senha, papéis e permissões.** Só o dono treina o modelo; usuários nascem por `app/seed.py`, não por rota pública — menos superfície de ataque, menos código.
-- **Observabilidade além de logs estruturados.** Fora de escopo para um projeto de portfólio de duas semanas.
+- **Observabilidade além de `logging`.** A API loga em texto os eventos que importam (modelo carregado ou ausente no start, treino iniciado, concluído com o F1, falhado com o erro). Métricas, tracing e log estruturado em JSON ficaram fora de escopo para um projeto de portfólio de duas semanas.
 
 ## Limitações conhecidas
 

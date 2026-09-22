@@ -2,8 +2,11 @@
   <title>Arquitetura do HateBR API</title>
   <desc>
     Streamlit fala HTTP com a FastAPI, que le e escreve no Postgres e so le o
-    modelo.pkl. O ml/treinar.py roda fora do processo da API, le os exemplos
-    no Postgres e escreve o modelo.pkl.
+    modelo.pkl. O ml/treinar.py e um processo a parte, le os exemplos no
+    Postgres e escreve o modelo.pkl. O app/ nao importa ml/ em tempo de
+    import: o unico acoplamento e um import adiado dentro de _executar_treino,
+    que so roda quando alguem pede um retreino, e essa rota responde 503 em
+    producao e no docker compose.
   </desc>
 
   <style>
@@ -64,7 +67,7 @@
   <!-- ml/treinar.py (processo externo) -->
   <rect class="caixa-externa" x="500" y="245" width="150" height="60" rx="10" />
   <text class="titulo" x="575" y="272">ml/treinar.py</text>
-  <text class="sub" x="575" y="290">fora do processo da API</text>
+  <text class="sub" x="575" y="290">processo à parte (CLI)</text>
 
   <!-- Streamlit -> FastAPI -->
   <path class="seta-escreve" marker-end="url(#ponta)" d="M170,135 L258,135" />
@@ -92,5 +95,9 @@
   <line x1="250" y1="325" x2="285" y2="325" class="seta-le" />
   <text class="nota" x="360" y="329">seta tracejada = só lê</text>
 
-  <text class="nota" x="500" y="329">app/ nunca importa ml/</text>
+  <!-- nota sobre o acoplamento real entre app/ e ml/ -->
+  <text class="nota" x="130" y="245">app/ não importa ml/ em tempo</text>
+  <text class="nota" x="130" y="262">de import. O único acoplamento</text>
+  <text class="nota" x="130" y="279">é um import adiado, só no</text>
+  <text class="nota" x="130" y="296">retreino (503 em produção).</text>
 </svg>

@@ -1,7 +1,8 @@
 """Carrega o pipeline treinado e responde predições.
 
 Este módulo NÃO treina nada. Treino é responsabilidade de `ml/treinar.py`,
-que roda fora do processo da API.
+um processo à parte — a exceção é o retreino sob demanda, que o
+`_executar_treino` de `app/routers/treinos.py` importa de forma adiada.
 """
 
 from pathlib import Path
