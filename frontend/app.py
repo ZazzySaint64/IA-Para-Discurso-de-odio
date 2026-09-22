@@ -122,6 +122,10 @@ with aba_treino:
             elif resposta.status_code == 202:
                 treino_id = resposta.json()["id"]
                 final = None
+                # "teto": os 60s passaram sem concluir. "erro": o poll parou antes disso
+                # (rede caiu, resposta ruim) — a mensagem de erro já foi mostrada, então o
+                # teto não deve ser reclamado por cima de um tempo que não se passou.
+                motivo = "teto"
                 # Uma rodada real leva ~7s nesta máquina; o teto de 60s é só uma rede de
                 # segurança para não travar o painel se algo emperrar.
                 with st.status("Treinando o modelo...", expanded=True) as status:
@@ -129,6 +133,7 @@ with aba_treino:
                     while time.time() - inicio < 60:
                         acompanha = pedir("GET", f"/treinos/{treino_id}", headers=cabecalho)
                         if acompanha is None:
+                            motivo = "erro"
                             break
                         if acompanha.status_code == 401:
                             st.session_state.token = None
@@ -136,6 +141,7 @@ with aba_treino:
                             st.rerun()
                         if acompanha.status_code != 200:
                             st.warning(detalhe(acompanha))
+                            motivo = "erro"
                             break
                         dado = acompanha.json()
                         if dado["status"] in ("concluido", "falhou"):
@@ -149,16 +155,11 @@ with aba_treino:
                             break
                         time.sleep(2)
 
-                if final is None:
-                    st.info(
-                        f"Ainda está treinando depois de 1 minuto de espera — isso é raro. "
-                        f"Confira o resultado daqui a pouco, é o treino de id {treino_id}."
-                    )
-                elif final["status"] == "falhou":
+                if final is not None and final["status"] == "falhou":
                     st.error(f"O treino falhou: {final['erro']}")
-                elif final["substituiu"]:
+                elif final is not None and final["substituiu"] is True:
                     st.success(f"Modelo atualizado! O novo F1 é {final['f1_macro']:.3f}.")
-                else:
+                elif final is not None and final["substituiu"] is False:
                     texto_antes = f"{f1_antes:.3f}" if f1_antes is not None else "—"
                     st.info(
                         f"O treino terminou, mas mantive o modelo que já estava no ar: esta "
@@ -166,6 +167,19 @@ with aba_treino:
                         f"modelo atual. Isso é normal — o resultado varia um pouco a cada "
                         f"rodada, e só troco o modelo quando o novo realmente é melhor."
                     )
+                elif final is not None:
+                    # substituiu veio None: não deveria acontecer (concluido sempre grava
+                    # junto), mas se acontecer é melhor dizer "não sei" do que arriscar.
+                    st.warning(
+                        f"O treino concluiu, mas não consegui confirmar se o modelo foi "
+                        f"atualizado. Confira o treino de id {treino_id}."
+                    )
+                elif motivo == "teto":
+                    st.info(
+                        f"Ainda está treinando depois de 1 minuto de espera — isso é raro. "
+                        f"Confira o resultado daqui a pouco, é o treino de id {treino_id}."
+                    )
+                # motivo == "erro": a mensagem já apareceu no loop, nada a acrescentar.
             else:
                 st.warning(detalhe(resposta))
 

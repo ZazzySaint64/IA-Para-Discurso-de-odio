@@ -64,7 +64,7 @@ pip install -r requirements.txt -r frontend/requirements.txt
 python main.py
 ```
 
-`python main.py`: cria o `.env` se ele ainda não existir (gera um `JWT_SECRET` novo, aponta pra um SQLite local em `dev.db`) e não mexe nele se já existir; roda `alembic upgrade head`; sobe a API em `localhost:8000` e o Streamlit em `localhost:8501`, espera os dois responderem de verdade (`/health` sendo consultado em loop, não um sleep chutado) e abre o navegador. **Ctrl+C encerra os dois processos.** Se nenhum usuário existir ainda, ele avisa e imprime o comando de seed abaixo — a aba de treino do Streamlit não consegue logar sem um. As portas 8000 e 8501 precisam estar livres; se alguma estiver ocupada, o script diz qual e sai, sem procurar outra.
+`python main.py`: cria o `.env` se ele ainda não existir (gera um `JWT_SECRET` novo, aponta pra um SQLite local em `dev.db`) e não mexe nele se já existir; roda `alembic upgrade head`; sobe a API em `localhost:8000` e o Streamlit em `localhost:8501`, espera os dois responderem de verdade (a API em `/health`, o Streamlit na raiz — consultados em loop, não um sleep chutado) e abre o navegador. **Ctrl+C encerra os dois processos.** Se nenhum usuário existir ainda, ele avisa e imprime o comando de seed abaixo — a aba de treino do Streamlit não consegue logar sem um. As portas 8000 e 8501 precisam estar livres; se alguma estiver ocupada, o script diz qual e sai, sem procurar outra.
 
 Criar o usuário que treina o modelo (a senha aparece uma vez no terminal, salva num gerenciador de senhas):
 

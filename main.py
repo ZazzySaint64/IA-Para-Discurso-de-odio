@@ -98,13 +98,13 @@ def esperar(url: str, processo: subprocess.Popen, nome: str, exigir_200: bool = 
 
 
 def main() -> None:
-    checar_portas()
-    env = criar_env_se_faltar()
-    aplicar_migrations()
-    checar_usuario(env)
-
     api = streamlit = None
     try:
+        checar_portas()
+        env = criar_env_se_faltar()
+        aplicar_migrations()
+        checar_usuario(env)
+
         api = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(PORTA_API)], cwd=RAIZ
         )
