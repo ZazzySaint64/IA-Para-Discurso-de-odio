@@ -109,7 +109,7 @@ O deploy é via [Render](https://render.com) Blueprint, lendo o `render.yaml` j�
 - **CSV, JSON e log soltos viraram tabelas.** Os exemplos ensinados, a melhor métrica já alcançada e o histórico de execuções, antes um CSV, um JSON e um arquivo de log soltos, viraram as tabelas `exemplo` e `treino` no Postgres. A constraint `UNIQUE` em `exemplo.texto` impede o mesmo exemplo repetido, coisa que o CSV aceitava e enviesava o treino — a API devolve `409`.
 - **Modelo e vetorizador separados viraram um pipeline só.** Salvar os dois passos (`TfidfVectorizer` + `LogisticRegression`) separadamente permite que saiam de sincronia; agora é um `sklearn.Pipeline` único, `joblib.dump` de um arquivo só.
 - **Treino separado da API.** Perfis de recurso opostos — inferência quer latência baixa e pouca RAM, treino quer bastante RAM por alguns minutos — e essa separação é o que cabe em um plano gratuito de 512 MB.
-- **Retreino desligado em produção, com o motivo, não escondido.** A flag `TREINO_HABILITADO` (padrão `false` em produção) controla `POST /treinos`; sem ela a rota devolve `503` explicando exatamente por quê (RAM insuficiente pra cross-validation, imagem sem os datasets).
+- **Retreino desligado em produção, com o motivo, não escondido.** A flag `TREINO_HABILITADO` (definida como `false` no `render.yaml` e no `docker-compose.yml`) controla `POST /treinos`; sem ela a rota devolve `503` explicando exatamente por quê (RAM insuficiente pra cross-validation, imagem sem os datasets).
 - **Predição não guarda IP nem identificação de quem digitou.** A tabela `predicao` só tem texto, label e confiança — decisão pensando em LGPD, já que a rota é pública.
 
 ## O que ficou de fora e por quê
