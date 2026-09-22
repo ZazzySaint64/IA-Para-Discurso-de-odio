@@ -23,6 +23,15 @@ def pedir(metodo: str, rota: str, **kwargs) -> requests.Response | None:
         return None
 
 
+def detalhe(resposta: requests.Response) -> str:
+    """O corpo nem sempre é JSON: um proxy na frente da API (o Render acorda
+    de hibernação com uma página de erro em HTML) responde outra coisa."""
+    try:
+        return resposta.json().get("detail", "Erro inesperado")
+    except ValueError:
+        return f"A API respondeu {resposta.status_code}. Tente de novo em instantes."
+
+
 aba_publica, aba_treino = st.tabs(["Classificar", "Painel de treino"])
 
 with aba_publica:
@@ -39,7 +48,7 @@ with aba_publica:
             else:
                 st.success(f"{dado['rotulo']} — confiança {dado['confianca']:.0%}")
         else:
-            st.warning(resposta.json().get("detail", "Erro inesperado"))
+            st.warning(detalhe(resposta))
 
     metricas = pedir("GET", "/metricas")
     if metricas is not None and metricas.status_code == 200:
@@ -90,7 +99,7 @@ with aba_treino:
                     st.warning("Sessão expirada, entre de novo.")
                     st.rerun()
                 else:
-                    st.error(resposta.json().get("detail", "Erro inesperado"))
+                    st.error(detalhe(resposta))
 
         if st.button("Atualizar modelo agora"):
             resposta = pedir("POST", "/treinos", headers=cabecalho)
@@ -99,12 +108,20 @@ with aba_treino:
             elif resposta.status_code == 202:
                 st.info(f"Treino iniciado (id {resposta.json()['id']}).")
             else:
-                st.warning(resposta.json().get("detail", "Erro inesperado"))
+                st.warning(detalhe(resposta))
 
         exemplos = pedir("GET", "/exemplos?limite=20", headers=cabecalho)
-        if exemplos is not None and exemplos.status_code == 200:
+        if exemplos is None:
+            pass
+        elif exemplos.status_code == 200:
             st.subheader(f"Exemplos ensinados ({exemplos.json()['total']})")
             st.dataframe(exemplos.json()["itens"], use_container_width=True)
+        elif exemplos.status_code == 401:
+            st.session_state.token = None
+            st.warning("Sessão expirada, entre de novo.")
+            st.rerun()
+        else:
+            st.error(detalhe(exemplos))
 
         if st.button("Sair"):
             st.session_state.token = None
