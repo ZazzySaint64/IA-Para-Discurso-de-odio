@@ -60,6 +60,12 @@ Pré-requisito: Docker e Docker Compose. Os comandos que dependem de Docker **n�
 ```bash
 git clone https://github.com/ZazzySaint64/IA-Para-Discurso-de-dio.git
 cd IA-Para-Discurso-de-dio
+cp .env.exemplo .env
+```
+
+O `cp` vem antes de tudo porque `JWT_SECRET` não tem valor padrão — de propósito: um default num repositório público seria um segredo que qualquer pessoa lê, então a aplicação prefere recusar-se a subir a fingir que está protegida. Consequência prática: **todo comando que roda Python direto na máquina** (`python -m ml.treinar`, `python -m app.seed`) aborta na hora sem um `.env`. Pelo `docker compose` não faz falta, porque o `docker-compose.yml` já define as variáveis. O `.env` está no `.gitignore`, e o valor que vem no exemplo serve só para desenvolvimento local — em produção quem gera o segredo é o Render (`generateValue: true` no `render.yaml`).
+
+```bash
 docker compose up --build
 ```
 
@@ -71,7 +77,7 @@ Criar o usuário que treina o modelo (a senha aparece uma vez no terminal, salva
 docker compose run --rm api python -m app.seed --gerar-senha
 ```
 
-Retreinar o modelo roda **fora** do container — a imagem não leva os datasets, e treino e inferência têm perfis de recurso opostos (ver "Decisões de projeto"). Baixe o [HateBR](https://github.com/franciellevargas/HateBR) e o [ToLD-BR](https://github.com/JAugusto97/ToLD-Br) e coloque `HateBR.csv` e `ToLD-BR.csv` em `HateBR-7.0.0/dataset/`, depois, com o Postgres do `docker compose up` já no ar (ele expõe a porta 5432):
+Retreinar o modelo roda **fora** do container — a imagem não leva os datasets, e treino e inferência têm perfis de recurso opostos (ver "Decisões de projeto"). Baixe o [HateBR](https://github.com/franciellevargas/HateBR) e o [ToLD-BR](https://github.com/JAugusto97/ToLD-Br) e coloque `HateBR.csv` e `ToLD-BR.csv` em `HateBR-7.0.0/dataset/`, depois, com o `.env` já criado (acima) e o Postgres do `docker compose up` no ar — ele expõe a porta 5432, que é a que o `.env.exemplo` aponta:
 
 ```bash
 pip install -r requirements.txt
@@ -97,11 +103,11 @@ O deploy é via [Render](https://render.com) Blueprint, lendo o `render.yaml` j�
 2. **New → Blueprint**, conecta este repositório do GitHub.
 3. O Render lê o `render.yaml` e cria sozinho o banco (`hatebr-db`, Postgres, plano free) e o serviço web (`hatebr-api`, Docker, plano free, health check em `/health`), gerando o `JWT_SECRET` automaticamente. `TREINO_HABILITADO` já entra como `false` em produção.
 4. Espera o build. As migrations rodam sozinhas no start do container (`entrypoint.sh`).
-5. Roda o seed **uma vez**, contra o banco do Render: no dashboard do `hatebr-db`, aba **Connect**, copia a "External Database URL", e roda localmente:
+5. Roda o seed **uma vez**, contra o banco do Render: no dashboard do `hatebr-db`, aba **Connect**, copia a "External Database URL", e roda localmente — este comando roda na tua máquina, não no container, então precisa do repositório clonado, do `pip install -r requirements.txt` e do `.env` criado em "Como rodar":
    ```bash
    DATABASE_URL="<external-database-url-do-render>" python -m app.seed --gerar-senha
    ```
-   Guarda a senha impressa — ela não é gravada em lugar nenhum, só aparece essa vez.
+   O `JWT_SECRET` do `.env` local não importa aqui: o seed só grava um hash bcrypt, não assina token nenhum — quem assina em produção é o segredo que o Render gerou. Guarda a senha impressa — ela não é gravada em lugar nenhum, só aparece essa vez.
 
 ## Decisões de projeto
 
@@ -123,6 +129,7 @@ O deploy é via [Render](https://render.com) Blueprint, lendo o `render.yaml` j�
 ## Limitações conhecidas
 
 - **`POST /treinos` tem uma corrida (TOCTOU).** A checagem de "já existe treino rodando" e a criação do novo registro não são atômicas: duas requisições verdadeiramente simultâneas podem, em teoria, iniciar dois treinos ao mesmo tempo. O caso realista — um duplo clique no botão do painel — está coberto, porque a linha do primeiro treino é commitada no banco antes da resposta voltar pro cliente.
+- **Se a recarga do modelo falhar, o F1 daquele retreino se perde.** Quando o retreino melhora o score, `_executar_treino` grava o `.pkl` novo e só então chama `ml.carregar_modelo`. Se essa carga levantar (artefato corrompido, disco cheio), a linha vai para `falhou` sem gravar o `f1_macro` — e o artefato novo, que já está em disco, passa a ser servido no próximo restart enquanto `/metricas` continua publicando o F1 antigo, mais baixo. Como esse mesmo número é a baseline do próximo treino, um modelo pior poderia depois sobrescrever um melhor. É raro (exige o `joblib.dump` funcionar e o `joblib.load` seguinte não), e marcar a linha como `falhou` é deliberado: um artefato que não carrega é um retreino que falhou do ponto de vista de quem consome a API. Fica registrado em vez de escondido.
 - **Retreino desligado no container e em produção.** `TREINO_HABILITADO=false` tanto no `docker compose` local quanto no Render; para retreinar de fato, roda `python -m ml.treinar` fora do Docker (ver "Como rodar"). É uma limitação deliberada, não um bug — está documentada em "Decisões de projeto".
 - **Qualidade real do modelo: F1 macro ≈ 0,75.** É um modelo linear simples (TF-IDF + Regressão Logística), não um transformer. Ele erra frases curtas e sem alvo explícito — por exemplo, classifica "eu te odeio" como não-ódio, com confiança baixa (~60%). Serve bem como demonstração de engenharia; não é production-grade para moderação de conteúdo real.
 
