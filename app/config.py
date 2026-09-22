@@ -25,5 +25,13 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def normalizar_url(cls, v: str) -> str:
+        """O Render entrega postgres://; o SQLAlchemy 2.0 exige o driver explícito."""
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+psycopg://", 1)
+        return v
+
 
 settings = Settings()
