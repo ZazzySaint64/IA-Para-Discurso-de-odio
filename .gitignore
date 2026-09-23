@@ -60,6 +60,7 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+dev.db
 
 # Flask stuff:
 instance/
@@ -224,6 +225,9 @@ HateBR-7.0.0/
 
 # Gerado pelo treino/retreino — não versionar
 *.pkl
+# O artefato treinado é versionado de propósito: o deploy precisa dele.
+# Os datasets originais continuam fora do repositório.
+!ml/artefatos/modelo.pkl
 best_score.json
 historico_execucoes.log
 feedback_treino.csv
@@ -231,3 +235,9 @@ feedback_treino.csv
 
 # Config local (caminhos da sua máquina)
 .claude/
+
+.venv/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage

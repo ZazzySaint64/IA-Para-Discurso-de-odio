@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hatebr
+      POSTGRES_PASSWORD: hatebr
+      POSTGRES_DB: hatebr
+    ports:
+      - "5432:5432"
+    volumes:
+      - dados_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hatebr"]
+      interval: 5s
+      retries: 5
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://hatebr:hatebr@db:5432/hatebr
+      JWT_SECRET: segredo-de-desenvolvimento-nao-usar-em-producao
+      # O container nunca treina: a imagem não leva os datasets, e treino e inferência
+      # têm perfis de recurso opostos. Para retreinar, rode na máquina:
+      #   python -m ml.treinar
+      TREINO_HABILITADO: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: python:3.12-slim
+    working_dir: /front
+    volumes:
+      - ./frontend:/front
+    command: >
+      sh -c "pip install --no-cache-dir -r requirements.txt &&
+             streamlit run app.py --server.address 0.0.0.0 --server.port 8501"
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+
+volumes:
+  dados_postgres:

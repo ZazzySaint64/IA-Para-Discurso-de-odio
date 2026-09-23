@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# docs/ guarda a spec e o plano: sao requisitos, nao codigo do projeto.
+# alembic/versions guarda migrations autogeradas: nao vale a pena reformatar
+# a cada `alembic revision --autogenerate`.
+extend-exclude = ["docs", "alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Depends(...) como default de argumento e o padrao do FastAPI para injecao de dependencia.
+extend-immutable-calls = ["fastapi.Depends"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
