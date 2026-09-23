@@ -30,9 +30,16 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL")
     @classmethod
     def normalizar_url(cls, v: str) -> str:
-        """O Render entrega postgres://; o SQLAlchemy 2.0 exige o driver explícito."""
+        """O Render entrega a URL do Postgres como postgres:// em alguns lugares
+        e postgresql:// (com "ql") em outros — os dois carecem do driver
+        explícito que o SQLAlchemy 2.0 exige, senão ele cai no psycopg2, que
+        este projeto não instala (instala psycopg[binary], o psycopg 3)."""
+        if v.startswith("postgresql+"):
+            return v
         if v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql+psycopg://", 1)
+            return "postgresql+psycopg://" + v[len("postgres://") :]
+        if v.startswith("postgresql://"):
+            return "postgresql+psycopg://" + v[len("postgresql://") :]
         return v
 
 

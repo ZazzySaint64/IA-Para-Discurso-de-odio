@@ -19,6 +19,23 @@ def test_url_do_render_e_normalizada():
     assert s.DATABASE_URL == "postgresql+psycopg://u:p@host:5432/db"
 
 
+def test_url_postgresql_sem_driver_e_normalizada():
+    """O Render também entrega DATABASE_URL como postgresql:// (com "ql"),
+    forma que não começa com "postgres://" e por isso escapava do validador."""
+    s = Settings(DATABASE_URL="postgresql://u:p@host:5432/db")
+    assert s.DATABASE_URL == "postgresql+psycopg://u:p@host:5432/db"
+
+
 def test_url_ja_correta_nao_e_alterada():
     url = "postgresql+psycopg://u:p@host:5432/db"
+    assert Settings(DATABASE_URL=url).DATABASE_URL == url
+
+
+def test_url_sqlite_nao_e_alterada():
+    url = "sqlite:///./dev.db"
+    assert Settings(DATABASE_URL=url).DATABASE_URL == url
+
+
+def test_url_com_outro_driver_explicito_nao_e_alterada():
+    url = "postgresql+asyncpg://u:p@host:5432/db"
     assert Settings(DATABASE_URL=url).DATABASE_URL == url
