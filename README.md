@@ -11,11 +11,11 @@
 
 ## No ar
 
-**https://hatebr-api.onrender.com/docs** — Swagger, com botão **Authorize** pra testar as rotas protegidas direto do navegador.
+**https://hatebr-web.onrender.com** — a interface Streamlit, pra quem só quer classificar um comentário sem mexer em Swagger.
 
-A API em si: **https://hatebr-api.onrender.com**
+Pra quem quer testar a API direto: **https://hatebr-api.onrender.com/docs** (Swagger, com botão **Authorize** pra testar as rotas protegidas do navegador).
 
-O plano gratuito do Render hiberna o serviço depois de 15 minutos sem uso. Se o link estiver "dormindo", a primeira requisição demora cerca de 50 segundos pra acordar o container — as seguintes voltam ao normal.
+Os dois são serviços separados no plano gratuito do Render, e cada um hiberna depois de 15 minutos sem uso. Se um deles estiver "dormindo", a primeira requisição demora cerca de 50 segundos pra acordar o container — na pior hipótese (interface e API dormindo juntas), a primeira resposta pode levar perto de 2 minutos. As requisições seguintes voltam ao normal.
 
 ## O que é
 
