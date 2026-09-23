@@ -11,10 +11,11 @@ import requests
 import streamlit as st
 
 API = os.getenv("API_URL", "http://localhost:8000")
-TIMEOUT = 60  # teto por chamada; a espera pela hibernação é o retry em pedir(), não isto
-# pedir() só devolve None depois dos ~90s de retry: nesse ponto não é mais "acordando",
-# é "não respondeu mesmo" — por isso a mensagem não repete o tom de "tente já-já" do
-# fallback de detalhe() para 502.
+TIMEOUT = 60  # teto por tentativa — mas pedir() encolhe isso perto do prazo de 90s
+PRAZO = 90  # segundos de relógio, não de contagem de tentativas — ver pedir()
+# pedir() só devolve None depois do PRAZO de retry: nesse ponto não é mais
+# "acordando", é "não respondeu mesmo" — por isso a mensagem não repete o tom
+# de "tente já-já" do fallback de detalhe() para 502.
 MENSAGEM_SEM_RESPOSTA = (
     "A API não respondeu depois de esperar a hibernação passar — ela pode estar fora do ar."
 )
@@ -23,26 +24,34 @@ MENSAGEM_SEM_RESPOSTA = (
 def pedir(metodo: str, rota: str, **kwargs) -> requests.Response | None:
     """502/503/504 aqui não é "a API caiu": é o Render acordando o container
     hibernado, e o gateway responde esse erro na hora, sem esperar o container
-    subir — por isso TIMEOUT nunca ajudava. Insiste por ~90s (sobra pra
-    hibernação acabar) antes de devolver a última tentativa pro chamador
-    tratar como sempre. Uma exceção de conexão no meio da hibernação é a
-    mesma situação, então também conta como motivo pra tentar de novo.
+    subir. Insiste por até PRAZO segundos (sobra pra hibernação acabar) antes
+    de devolver a última tentativa pro chamador tratar como sempre. Uma
+    exceção de conexão no meio da hibernação é a mesma situação, então
+    também conta como motivo pra tentar de novo.
+
+    O prazo é por relógio (time.monotonic()), não por número de tentativas:
+    um container que aceita a conexão e trava sem responder gasta até
+    TIMEOUT segundos numa tentativa só, e isso precisa contar pro prazo —
+    senão o teto de verdade vira TIMEOUT vezes o número de tentativas, bem
+    mais que os PRAZO segundos prometidos no spinner. Por isso o timeout de
+    cada tentativa também encolhe pro tempo que sobrou.
     """
-    decorridos = 0
     intervalo = 5
+    inicio = time.monotonic()
     resposta = None
     while True:
+        decorrido = time.monotonic() - inicio
+        if decorrido >= PRAZO:
+            return resposta
+        teto = max(1, min(TIMEOUT, PRAZO - decorrido))
         try:
-            resposta = requests.request(metodo, f"{API}{rota}", timeout=TIMEOUT, **kwargs)
+            resposta = requests.request(metodo, f"{API}{rota}", timeout=teto, **kwargs)
         except requests.RequestException:
             resposta = None
         else:
             if resposta.status_code not in (502, 503, 504):
                 return resposta
-        if decorridos >= 90:
-            return resposta
         time.sleep(intervalo)
-        decorridos += intervalo
 
 
 st.set_page_config(page_title="Detector de Discurso de Ódio", page_icon="🛡️")
@@ -63,7 +72,9 @@ with aba_publica:
     st.title("Detector de Discurso de Ódio")
     texto = st.text_area("Comentário", max_chars=1000)
     if st.button("Classificar", disabled=not texto.strip()):
-        with st.spinner("Classificando — se a API estava hibernando, pode levar até 1 minuto..."):
+        with st.spinner(
+            "Classificando — se a API estava hibernando, pode levar até 1 minuto e meio..."
+        ):
             resposta = pedir("POST", "/predicoes", json={"texto": texto})
         if resposta is None:
             st.error(MENSAGEM_SEM_RESPOSTA)
@@ -80,7 +91,9 @@ with aba_publica:
     # estava hibernando, é aqui que a espera de até ~1 minuto acontece. O
     # spinner some sozinho assim que a resposta chega, então em uso normal
     # (API já acordada) ele nem chega a aparecer.
-    with st.spinner("Conectando à API — se ela estava hibernando, pode levar até 1 minuto..."):
+    with st.spinner(
+        "Conectando à API — se ela estava hibernando, pode levar até 1 minuto e meio..."
+    ):
         metricas = pedir("GET", "/metricas")
     if metricas is not None and metricas.status_code == 200:
         m = metricas.json()
@@ -101,7 +114,7 @@ with aba_treino:
             senha = st.text_input("Senha", type="password")
             if st.form_submit_button("Entrar"):
                 with st.spinner(
-                    "Entrando — se a API estava hibernando, pode levar até 1 minuto..."
+                    "Entrando — se a API estava hibernando, pode levar até 1 minuto e meio..."
                 ):
                     resposta = pedir(
                         "POST", "/auth/login", data={"username": email, "password": senha}
@@ -125,7 +138,8 @@ with aba_treino:
             rotulo = st.radio("É discurso de ódio?", ["Não", "Sim"], horizontal=True)
             if st.form_submit_button("Guardar este exemplo"):
                 with st.spinner(
-                    "Guardando o exemplo — se a API estava hibernando, pode levar até 1 minuto..."
+                    "Guardando o exemplo — se a API estava hibernando, pode levar até "
+                    "1 minuto e meio..."
                 ):
                     resposta = pedir(
                         "POST",
@@ -151,7 +165,7 @@ with aba_treino:
             # respondeu 202; a espera pela hibernação acontece antes disso, então
             # precisa do próprio spinner aqui.
             with st.spinner(
-                "Iniciando o treino — se a API estava hibernando, pode levar até 1 minuto..."
+                "Iniciando o treino — se a API estava hibernando, pode levar até 1 minuto e meio..."
             ):
                 # F1 "de antes" vem daqui, não do resultado do treino: se ele mantiver o
                 # modelo, o que está no ar continua sendo este número.

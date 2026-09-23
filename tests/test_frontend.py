@@ -50,12 +50,26 @@ def frontend_app():
 
 @pytest.fixture
 def sem_dormir(monkeypatch, frontend_app):
-    """time.sleep vira no-op: como o deadline de pedir() é contado por um
-    acumulador incrementado a cada chamada de sleep (não pelo relógio real),
-    isso é suficiente para o teste não esperar os ~90s de verdade."""
+    """time.sleep vira no-op, só pra não perder tempo real nos poucos casos em
+    que o laço chega a dormir de verdade. Sozinho isso NÃO evita a espera de
+    ~90s nos testes de deadline: o prazo de pedir() é por time.monotonic(),
+    que é relógio de parede real se não for mockado também — ver
+    `relogio_falso`."""
     chamadas = []
     monkeypatch.setattr(frontend_app.time, "sleep", lambda s: chamadas.append(s))
     return chamadas
+
+
+@pytest.fixture
+def relogio_falso(monkeypatch, frontend_app):
+    """Troca time.monotonic() por um relógio controlado à mão (começa em 0,
+    só anda quando o teste manda). Os testes que precisam do prazo de 90s se
+    esgotar avançam esse relógio dentro do próprio fake de requests.request —
+    modelando o tempo que a chamada de rede "gastou" — em vez de depender do
+    tempo real passar."""
+    estado = {"agora": 0.0}
+    monkeypatch.setattr(frontend_app.time, "monotonic", lambda: estado["agora"])
+    return estado
 
 
 def test_200_retorna_na_hora_sem_dormir(frontend_app, sem_dormir, monkeypatch):
@@ -77,13 +91,44 @@ def test_502_depois_200_retorna_o_200(frontend_app, sem_dormir, monkeypatch):
     assert len(sem_dormir) == 1
 
 
-def test_502_persistente_retorna_o_ultimo_502_sem_travar(frontend_app, sem_dormir, monkeypatch):
-    monkeypatch.setattr(frontend_app.requests, "request", lambda *a, **k: _Resposta(502))
+def test_502_persistente_retorna_o_ultimo_502_sem_travar(
+    frontend_app, sem_dormir, relogio_falso, monkeypatch
+):
+    def request_falso(*a, **k):
+        relogio_falso["agora"] += 10  # cada tentativa "gasta" 10s simulados
+        return _Resposta(502)
+
+    monkeypatch.setattr(frontend_app.requests, "request", request_falso)
 
     resposta = frontend_app.pedir("GET", "/saude")
 
     assert resposta.status_code == 502
     assert len(sem_dormir) > 0
+
+
+def test_502_persistente_desiste_pelo_prazo_nao_pela_contagem(
+    frontend_app, sem_dormir, relogio_falso, monkeypatch
+):
+    """O bug que motivou o fix: se o tempo gasto dentro de requests.request()
+    não contasse pro prazo, um container que aceita a conexão e trava (até
+    TIMEOUT=60s por tentativa) faria o teto real virar TIMEOUT vezes o número
+    de tentativas — bem mais que os ~90s prometidos no spinner. Aqui cada
+    tentativa "demora" 40s simulados, então o prazo de 90s tem que se esgotar
+    em 3 tentativas (0s, 40s, 80s — a próxima checagem já está em 120s), não
+    nas ~19 que a versão antiga (contagem por número de sleeps) faria."""
+    tentativas = []
+
+    def request_falso(*a, **k):
+        tentativas.append(1)
+        relogio_falso["agora"] += 40
+        return _Resposta(502)
+
+    monkeypatch.setattr(frontend_app.requests, "request", request_falso)
+
+    resposta = frontend_app.pedir("GET", "/saude")
+
+    assert resposta.status_code == 502
+    assert len(tentativas) == 3
 
 
 def test_excecao_de_conexao_depois_200_retorna_o_200(frontend_app, sem_dormir, monkeypatch):
