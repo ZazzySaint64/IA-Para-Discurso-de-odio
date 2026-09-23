@@ -10,7 +10,6 @@ import time
 
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 
 API = os.getenv("API_URL", "http://localhost:8000")
 TIMEOUT = 60  # teto por tentativa — mas pedir() encolhe isso perto do prazo de 90s
@@ -67,10 +66,15 @@ st.set_page_config(page_title="Detector de Discurso de Ódio", page_icon="🛡�
 # fetch chega e dispara no navegador enquanto o pedir() de baixo ainda está
 # esperando a API acordar. mode: "no-cors" porque a resposta não importa, só
 # o pedido; sem isso a API precisaria de CORS configurado à toa.
+# st.iframe (não components.v1.html, removido do Streamlit) renderiza este
+# HTML com allow-scripts no sandbox do iframe, então o <script> roda de
+# verdade. A única parte variável do HTML é API, vinda da nossa própria
+# variável de ambiente e embutida via json.dumps — não é HTML de origem
+# externa/não confiável, o aviso da docstring de st.iframe não se aplica aqui.
 _SCRIPT_ACORDAR = (
     f'<script>fetch({json.dumps(API)} + "/health", {{mode: "no-cors"}}).catch(() => {{}});</script>'
 )
-components.html(_SCRIPT_ACORDAR, height=0)
+st.iframe(_SCRIPT_ACORDAR, height=1)
 
 
 def detalhe(resposta: requests.Response) -> str:

@@ -33,10 +33,9 @@ class _Resposta:
 
 @pytest.fixture(scope="module")
 def script_html_capturado():
-    """Guarda o argumento que o módulo passou pra components.html no import —
-    precisa ser capturado durante o exec_module, então o patch de
-    components.html tem que estar de pé antes do import, junto com o de
-    requests.request."""
+    """Guarda o argumento que o módulo passou pra st.iframe no import — precisa
+    ser capturado durante o exec_module, então o patch de st.iframe tem que
+    estar de pé antes do import, junto com o de requests.request."""
     return []
 
 
@@ -49,17 +48,17 @@ def frontend_app(script_html_capturado):
     corpo_metricas = {"total_predicoes": 0, "taxa_odio": 0.0, "f1_modelo": None}
     original = requests.request
     requests.request = lambda *a, **k: _Resposta(200, corpo_metricas)
-    import streamlit.components.v1 as components
+    import streamlit as st
 
-    components_html_original = components.html
-    components.html = lambda html, **k: script_html_capturado.append(html)
+    iframe_original = st.iframe
+    st.iframe = lambda html, **k: script_html_capturado.append(html)
     try:
         spec = importlib.util.spec_from_file_location("frontend_app_sob_teste", CAMINHO_APP)
         modulo = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(modulo)
     finally:
         requests.request = original
-        components.html = components_html_original
+        st.iframe = iframe_original
     return modulo
 
 
