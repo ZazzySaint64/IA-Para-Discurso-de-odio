@@ -13,6 +13,7 @@ tentaria bater em http://localhost:8000 de verdade.
 """
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -31,7 +32,16 @@ class _Resposta:
 
 
 @pytest.fixture(scope="module")
-def frontend_app():
+def script_html_capturado():
+    """Guarda o argumento que o módulo passou pra components.html no import —
+    precisa ser capturado durante o exec_module, então o patch de
+    components.html tem que estar de pé antes do import, junto com o de
+    requests.request."""
+    return []
+
+
+@pytest.fixture(scope="module")
+def frontend_app(script_html_capturado):
     # O import roda o corpo do módulo até o fim (streamlit em modo nu não
     # levanta), inclusive o `pedir("GET", "/metricas")` da aba pública, que
     # em seguida chama `.json()` na resposta — por isso o corpo precisa das
@@ -39,12 +49,17 @@ def frontend_app():
     corpo_metricas = {"total_predicoes": 0, "taxa_odio": 0.0, "f1_modelo": None}
     original = requests.request
     requests.request = lambda *a, **k: _Resposta(200, corpo_metricas)
+    import streamlit.components.v1 as components
+
+    components_html_original = components.html
+    components.html = lambda html, **k: script_html_capturado.append(html)
     try:
         spec = importlib.util.spec_from_file_location("frontend_app_sob_teste", CAMINHO_APP)
         modulo = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(modulo)
     finally:
         requests.request = original
+        components.html = components_html_original
     return modulo
 
 
@@ -129,6 +144,15 @@ def test_502_persistente_desiste_pelo_prazo_nao_pela_contagem(
 
     assert resposta.status_code == 502
     assert len(tentativas) == 3
+
+
+def test_script_de_acordar_embute_a_url_da_api_como_literal_js_seguro(
+    frontend_app, script_html_capturado
+):
+    assert len(script_html_capturado) == 1
+    script = script_html_capturado[0]
+    assert json.dumps(frontend_app.API) in script
+    assert 'mode: "no-cors"' in script
 
 
 def test_excecao_de_conexao_depois_200_retorna_o_200(frontend_app, sem_dormir, monkeypatch):

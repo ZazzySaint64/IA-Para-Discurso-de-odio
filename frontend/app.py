@@ -4,11 +4,13 @@ Este arquivo NÃO carrega o modelo e NÃO acessa o banco. Ele só fala HTTP
 com a API. Foi exatamente essa separação que motivou o redesenho do projeto.
 """
 
+import json
 import os
 import time
 
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 API = os.getenv("API_URL", "http://localhost:8000")
 TIMEOUT = 60  # teto por tentativa — mas pedir() encolhe isso perto do prazo de 90s
@@ -56,6 +58,20 @@ def pedir(metodo: str, rota: str, **kwargs) -> requests.Response | None:
 
 st.set_page_config(page_title="Detector de Discurso de Ódio", page_icon="🛡️")
 
+# Vem antes de qualquer pedir() bloqueante de propósito: o Render só acorda
+# um serviço free a partir de tráfego na borda pública, e uma chamada feita
+# pelo container do hatebr-web não passa por ela — só o navegador do
+# visitante passa. Streamlit manda os elementos pro navegador incrementalmente
+# (a fila de mensagens é esvaziada a cada 5ms num loop separado da thread que
+# roda este script — ver MESSAGE_FLUSH_INTERVAL_SECS no runtime), então este
+# fetch chega e dispara no navegador enquanto o pedir() de baixo ainda está
+# esperando a API acordar. mode: "no-cors" porque a resposta não importa, só
+# o pedido; sem isso a API precisaria de CORS configurado à toa.
+_SCRIPT_ACORDAR = (
+    f'<script>fetch({json.dumps(API)} + "/health", {{mode: "no-cors"}}).catch(() => {{}});</script>'
+)
+components.html(_SCRIPT_ACORDAR, height=0)
+
 
 def detalhe(resposta: requests.Response) -> str:
     """O corpo nem sempre é JSON: um proxy na frente da API (o Render acorda
@@ -101,6 +117,8 @@ with aba_publica:
         c1.metric("Classificações feitas", m["total_predicoes"])
         c2.metric("Taxa de ódio", f"{m['taxa_odio']:.0%}")
         c3.metric("F1 do modelo", f"{m['f1_modelo']:.3f}" if m["f1_modelo"] else "—")
+    elif metricas is None:
+        st.caption("Não consegui carregar as métricas — a API não respondeu a tempo.")
 
 with aba_treino:
     st.title("Painel de treino")
