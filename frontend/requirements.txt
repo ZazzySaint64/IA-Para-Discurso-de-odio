@@ -1,2 +1,2 @@
-streamlit>=1.56  # st.iframe (usado em app.py pra acordar a API) só existe a partir daqui
+streamlit>=1.64.0  # st.iframe (usado em app.py pra acordar a API) só existe a partir daqui
 requests>=2.32
