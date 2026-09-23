@@ -6,7 +6,7 @@ psycopg[binary]>=3.2
 pydantic-settings>=2.5
 python-multipart>=0.0.12
 pyjwt>=2.9
-bcrypt>=4.2
+bcrypt>=5.0.0
 slowapi>=0.1.9
 joblib>=1.4
 # O modelo.pkl versionado foi gerado com 1.9.1: unpickle é sensível à versão,
