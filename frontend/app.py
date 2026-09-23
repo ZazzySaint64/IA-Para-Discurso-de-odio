@@ -12,6 +12,12 @@ import streamlit as st
 
 API = os.getenv("API_URL", "http://localhost:8000")
 TIMEOUT = 60  # teto por chamada; a espera pela hibernação é o retry em pedir(), não isto
+# pedir() só devolve None depois dos ~90s de retry: nesse ponto não é mais "acordando",
+# é "não respondeu mesmo" — por isso a mensagem não repete o tom de "tente já-já" do
+# fallback de detalhe() para 502.
+MENSAGEM_SEM_RESPOSTA = (
+    "A API não respondeu depois de esperar a hibernação passar — ela pode estar fora do ar."
+)
 
 
 def pedir(metodo: str, rota: str, **kwargs) -> requests.Response | None:
@@ -60,7 +66,7 @@ with aba_publica:
         with st.spinner("Classificando — se a API estava hibernando, pode levar até 1 minuto..."):
             resposta = pedir("POST", "/predicoes", json={"texto": texto})
         if resposta is None:
-            pass
+            st.error(MENSAGEM_SEM_RESPOSTA)
         elif resposta.status_code == 201:
             dado = resposta.json()
             if dado["label"] == 1:
@@ -101,7 +107,7 @@ with aba_treino:
                         "POST", "/auth/login", data={"username": email, "password": senha}
                     )
                 if resposta is None:
-                    pass
+                    st.error(MENSAGEM_SEM_RESPOSTA)
                 elif resposta.status_code == 200:
                     st.session_state.token = resposta.json()["access_token"]
                     st.rerun()
@@ -128,7 +134,7 @@ with aba_treino:
                         headers=cabecalho,
                     )
                 if resposta is None:
-                    pass
+                    st.error(MENSAGEM_SEM_RESPOSTA)
                 elif resposta.status_code == 201:
                     st.success("Exemplo guardado.")
                 elif resposta.status_code == 409:
@@ -156,7 +162,7 @@ with aba_treino:
 
                 resposta = pedir("POST", "/treinos", headers=cabecalho)
             if resposta is None:
-                pass
+                st.error(MENSAGEM_SEM_RESPOSTA)
             elif resposta.status_code == 202:
                 treino_id = resposta.json()["id"]
                 final = None
@@ -171,6 +177,13 @@ with aba_treino:
                     while time.time() - inicio < 60:
                         acompanha = pedir("GET", f"/treinos/{treino_id}", headers=cabecalho)
                         if acompanha is None:
+                            # Perdi contato acompanhando, não rodando: o treino em si
+                            # pode muito bem ter continuado no servidor.
+                            st.warning(
+                                f"Perdi contato com a API acompanhando o treino — ela pode "
+                                f"estar fora do ar. O treino pode continuar rodando mesmo "
+                                f"assim: confira mais tarde o de id {treino_id}."
+                            )
                             motivo = "erro"
                             break
                         if acompanha.status_code == 401:
@@ -223,7 +236,7 @@ with aba_treino:
 
         exemplos = pedir("GET", "/exemplos?limite=20", headers=cabecalho)
         if exemplos is None:
-            pass
+            st.error(MENSAGEM_SEM_RESPOSTA)
         elif exemplos.status_code == 200:
             st.subheader(f"Exemplos ensinados ({exemplos.json()['total']})")
             st.dataframe(exemplos.json()["itens"], use_container_width=True)
