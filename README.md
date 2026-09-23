@@ -11,9 +11,9 @@
 
 ## No ar
 
-**`<< ainda não publiquei — troque esta linha por https://SEU-APP.onrender.com quando o deploy no Render estiver feito >>`**
+**https://hatebr-api.onrender.com/docs** — Swagger, com botão **Authorize** pra testar as rotas protegidas direto do navegador.
 
-Swagger (documentação interativa, com botão **Authorize**): `<url-acima>/docs`
+A API em si: **https://hatebr-api.onrender.com**
 
 O plano gratuito do Render hiberna o serviço depois de 15 minutos sem uso. Se o link estiver "dormindo", a primeira requisição demora cerca de 50 segundos pra acordar o container — as seguintes voltam ao normal.
 
