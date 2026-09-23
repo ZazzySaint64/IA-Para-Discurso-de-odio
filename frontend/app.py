@@ -51,7 +51,12 @@ with aba_publica:
         else:
             st.warning(detalhe(resposta))
 
-    metricas = pedir("GET", "/metricas")
+    # Primeira chamada da aba: se a API (ou o próprio container do Streamlit)
+    # estava hibernando, é aqui que a espera de até ~1 minuto acontece. O
+    # spinner some sozinho assim que a resposta chega, então em uso normal
+    # (API já acordada) ele nem chega a aparecer.
+    with st.spinner("Conectando à API — se ela estava hibernando, pode levar até 1 minuto..."):
+        metricas = pedir("GET", "/metricas")
     if metricas is not None and metricas.status_code == 200:
         m = metricas.json()
         c1, c2, c3 = st.columns(3)

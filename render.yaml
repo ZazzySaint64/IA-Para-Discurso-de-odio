@@ -16,6 +16,26 @@ services:
       - key: RATE_LIMIT_ATIVO
         value: "true"
 
+  - type: web
+    name: hatebr-web
+    runtime: python
+    plan: free
+    buildCommand: pip install -r frontend/requirements.txt
+    # --server.headless evita o prompt interativo de e-mail do Streamlit no
+    # primeiro boot (travaria o container, que não tem terminal). --browser.
+    # gatherUsageStats desliga o telemetry ping de saída no boot: sem ele,
+    # uma rede lenta no Render atrasa a subida por uma chamada que não serve
+    # a este app. CORS/XSRF ficam no padrão: nem o guia do Render nem o dos
+    # Streamlit docs pedem desligá-los para um deploy de serviço único como
+    # este — são flags de diagnóstico, não algo a ligar preventivamente.
+    startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    envVars:
+      - key: API_URL
+        fromService:
+          name: hatebr-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
 databases:
   - name: hatebr-db
     plan: free
