@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -72,6 +72,12 @@ async def erro_inesperado(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Erro interno no servidor"},
     )
+
+
+@app.get("/", include_in_schema=False)
+def raiz():
+    """Uma API REST não tem homepage: manda quem chegar aqui pra doc interativa."""
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health", tags=["infra"])
