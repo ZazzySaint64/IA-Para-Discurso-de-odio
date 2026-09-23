@@ -11,17 +11,35 @@ import requests
 import streamlit as st
 
 API = os.getenv("API_URL", "http://localhost:8000")
-TIMEOUT = 60  # o plano gratuito do Render hiberna; a primeira chamada demora
-
-st.set_page_config(page_title="Detector de Discurso de Ódio", page_icon="🛡️")
+TIMEOUT = 60  # teto por chamada; a espera pela hibernação é o retry em pedir(), não isto
 
 
 def pedir(metodo: str, rota: str, **kwargs) -> requests.Response | None:
-    try:
-        return requests.request(metodo, f"{API}{rota}", timeout=TIMEOUT, **kwargs)
-    except requests.RequestException as exc:
-        st.error(f"Não consegui falar com a API: {exc}")
-        return None
+    """502/503/504 aqui não é "a API caiu": é o Render acordando o container
+    hibernado, e o gateway responde esse erro na hora, sem esperar o container
+    subir — por isso TIMEOUT nunca ajudava. Insiste por ~90s (sobra pra
+    hibernação acabar) antes de devolver a última tentativa pro chamador
+    tratar como sempre. Uma exceção de conexão no meio da hibernação é a
+    mesma situação, então também conta como motivo pra tentar de novo.
+    """
+    decorridos = 0
+    intervalo = 5
+    resposta = None
+    while True:
+        try:
+            resposta = requests.request(metodo, f"{API}{rota}", timeout=TIMEOUT, **kwargs)
+        except requests.RequestException:
+            resposta = None
+        else:
+            if resposta.status_code not in (502, 503, 504):
+                return resposta
+        if decorridos >= 90:
+            return resposta
+        time.sleep(intervalo)
+        decorridos += intervalo
+
+
+st.set_page_config(page_title="Detector de Discurso de Ódio", page_icon="🛡️")
 
 
 def detalhe(resposta: requests.Response) -> str:
@@ -39,7 +57,8 @@ with aba_publica:
     st.title("Detector de Discurso de Ódio")
     texto = st.text_area("Comentário", max_chars=1000)
     if st.button("Classificar", disabled=not texto.strip()):
-        resposta = pedir("POST", "/predicoes", json={"texto": texto})
+        with st.spinner("Classificando — se a API estava hibernando, pode levar até 1 minuto..."):
+            resposta = pedir("POST", "/predicoes", json={"texto": texto})
         if resposta is None:
             pass
         elif resposta.status_code == 201:
@@ -75,7 +94,12 @@ with aba_treino:
             email = st.text_input("Email")
             senha = st.text_input("Senha", type="password")
             if st.form_submit_button("Entrar"):
-                resposta = pedir("POST", "/auth/login", data={"username": email, "password": senha})
+                with st.spinner(
+                    "Entrando — se a API estava hibernando, pode levar até 1 minuto..."
+                ):
+                    resposta = pedir(
+                        "POST", "/auth/login", data={"username": email, "password": senha}
+                    )
                 if resposta is None:
                     pass
                 elif resposta.status_code == 200:
@@ -94,12 +118,15 @@ with aba_treino:
             novo = st.text_area("Comentário para ensinar", max_chars=1000)
             rotulo = st.radio("É discurso de ódio?", ["Não", "Sim"], horizontal=True)
             if st.form_submit_button("Guardar este exemplo"):
-                resposta = pedir(
-                    "POST",
-                    "/exemplos",
-                    json={"texto": novo, "label": 1 if rotulo == "Sim" else 0},
-                    headers=cabecalho,
-                )
+                with st.spinner(
+                    "Guardando o exemplo — se a API estava hibernando, pode levar até 1 minuto..."
+                ):
+                    resposta = pedir(
+                        "POST",
+                        "/exemplos",
+                        json={"texto": novo, "label": 1 if rotulo == "Sim" else 0},
+                        headers=cabecalho,
+                    )
                 if resposta is None:
                     pass
                 elif resposta.status_code == 201:
@@ -114,14 +141,20 @@ with aba_treino:
                     st.error(detalhe(resposta))
 
         if st.button("Atualizar modelo agora"):
-            # F1 "de antes" vem daqui, não do resultado do treino: se ele mantiver o
-            # modelo, o que está no ar continua sendo este número.
-            antes = pedir("GET", "/metricas")
-            f1_antes = None
-            if antes is not None and antes.status_code == 200:
-                f1_antes = antes.json()["f1_modelo"]
+            # O st.status logo abaixo só existe depois que o POST /treinos já
+            # respondeu 202; a espera pela hibernação acontece antes disso, então
+            # precisa do próprio spinner aqui.
+            with st.spinner(
+                "Iniciando o treino — se a API estava hibernando, pode levar até 1 minuto..."
+            ):
+                # F1 "de antes" vem daqui, não do resultado do treino: se ele mantiver o
+                # modelo, o que está no ar continua sendo este número.
+                antes = pedir("GET", "/metricas")
+                f1_antes = None
+                if antes is not None and antes.status_code == 200:
+                    f1_antes = antes.json()["f1_modelo"]
 
-            resposta = pedir("POST", "/treinos", headers=cabecalho)
+                resposta = pedir("POST", "/treinos", headers=cabecalho)
             if resposta is None:
                 pass
             elif resposta.status_code == 202:
