@@ -15,7 +15,8 @@ Tá num servidor gratuito, que dorme depois de 15 minutos sem ninguém usar. Se 
 
 O que dá pra fazer em 30 segundos, na aba **Classificar**:
 
-- Escreve "eu te odeio" e depois "odeio segunda-feira". A palavra é a mesma, mas só a primeira é contra alguém. O modelo acerta as duas.
+- Escreve "some da minha frente agora" e depois "some com essa dor de cabeça logo". A palavra é a mesma, mas só a primeira é contra alguém. O modelo acerta as duas, e nenhuma delas tava no que eu usei pra treinar ele.
+- Faz o mesmo com "odeio quando a impressora trava". Tem "odeio", mas não é contra ninguém.
 - Cola um comentário qualquer que você viu por aí e vê a porcentagem de confiança.
 - Tenta enganar ele. Tem frase que ainda passa, eu listo as que eu conheço lá embaixo.
 
