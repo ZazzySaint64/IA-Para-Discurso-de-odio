@@ -19,6 +19,7 @@ CATEGORIAS_TOXICIDADE = [
     "xenophobia",
 ]
 PASTA_PADRAO = Path("HateBR-7.0.0/dataset")
+CAMINHO_CURADAS_PADRAO = Path("ml/frases_curtas.csv")
 
 
 def carregar_dados(db: Session | None = None, pasta_datasets: Path = PASTA_PADRAO) -> pd.DataFrame:
@@ -52,3 +53,19 @@ def carregar_dados(db: Session | None = None, pasta_datasets: Path = PASTA_PADRA
             partes.append(pd.DataFrame(linhas, columns=["comentario", "label_final"]))
 
     return pd.concat(partes, ignore_index=True)
+
+
+def carregar_frases_curtas(caminho: Path = CAMINHO_CURADAS_PADRAO) -> pd.DataFrame:
+    """Frases curtas curadas à mão (ml/frases_curtas.csv).
+
+    HateBR e ToLD-BR são comentários longos de Instagram político: hostilidade
+    curta dirigida a uma pessoa ("eu te odeio", "morra") quase não aparece
+    neles, então o modelo nunca aprende esse padrão. Este CSV existe só pra
+    cobrir esse buraco. Separado de `carregar_dados` de propósito: ele entra
+    no treino com peso maior (ver `ml/treinar.py`) e NUNCA no CV — ver
+    `treinar()` para o motivo.
+    """
+    caminho = Path(caminho)
+    if not caminho.exists():
+        return pd.DataFrame(columns=["comentario", "label_final"])
+    return pd.read_csv(caminho)[["comentario", "label_final"]]
