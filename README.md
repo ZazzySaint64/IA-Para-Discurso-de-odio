@@ -1,35 +1,61 @@
 # IA para Discurso de Ódio
 
-![Python](https://img.shields.io/badge/python-3.12-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)
-![Postgres](https://img.shields.io/badge/Postgres-16-336791)
-![Docker](https://img.shields.io/badge/Docker-compose-2496ED)
-![License](https://img.shields.io/badge/license-MIT-green)
 [![CI](https://github.com/ZazzySaint64/IA-Para-Discurso-de-dio/actions/workflows/ci.yml/badge.svg)](https://github.com/ZazzySaint64/IA-Para-Discurso-de-dio/actions/workflows/ci.yml)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-> **EN:** A Portuguese hate-speech classifier (TF-IDF + Logistic Regression) served as a REST API — FastAPI, Postgres, JWT auth, background retraining, Docker, CI — with a Streamlit frontend that is a pure HTTP client. Full details below are in Portuguese, the project's language.
+> **EN:** A Portuguese hate-speech classifier served as a REST API (FastAPI, Postgres, JWT auth, background retraining, Docker, CI) with a Streamlit frontend that only talks to the API over HTTP. Live at https://hatebr-web.onrender.com. Details below are in Portuguese, the project's language.
 
-## No ar
+Um site onde você escreve um comentário em português e ele te diz se aquilo é ofensivo ou não. Por trás tem um modelo que eu treinei com uns 28 mil comentários reais de redes sociais, e um painel com senha onde eu ensino exemplos novos pra ele.
 
-**https://hatebr-web.onrender.com** — a interface Streamlit, pra quem só quer classificar um comentário sem mexer em Swagger.
+## Testa aqui
 
-Pra quem quer testar a API direto: **https://hatebr-api.onrender.com/docs** (Swagger, com botão **Authorize** pra testar as rotas protegidas do navegador).
+**https://hatebr-web.onrender.com**
 
-Os dois são serviços separados no plano gratuito do Render, e cada um hiberna depois de 15 minutos sem uso. Se um deles estiver "dormindo", a primeira requisição demora cerca de 50 segundos pra acordar o container — na pior hipótese (interface e API dormindo juntas), a primeira resposta pode levar perto de 2 minutos. As requisições seguintes voltam ao normal.
+Tá num servidor gratuito, que dorme depois de 15 minutos sem ninguém usar. Se for o primeiro acesso do dia, a primeira resposta pode levar até um minuto e meio. Não tá quebrado, tá acordando. Depois disso fica rápido.
 
-## O que é
+O que dá pra fazer em 30 segundos, na aba **Classificar**:
 
-Uma API que classifica um comentário em português como discurso de ódio ou não. O modelo é TF-IDF + Regressão Logística, validado com 5-fold cross-validation, F1 macro ≈ 0,75 no dataset combinado (HateBR + ToLD-BR). O domínio (classificação de texto) não é o foco do projeto — o foco é a engenharia em volta dele: API REST documentada, banco relacional, autenticação, testes, CI e deploy.
+- Escreve "eu te odeio" e depois "odeio segunda-feira". A palavra é a mesma, mas só a primeira é contra alguém. O modelo acerta as duas.
+- Cola um comentário qualquer que você viu por aí e vê a porcentagem de confiança.
+- Tenta enganar ele. Tem frase que ainda passa, eu listo as que eu conheço lá embaixo.
 
-Existe uma rota pública para classificar texto e consultar métricas, e rotas autenticadas por JWT para quem treina o modelo: registrar exemplos rotulados e disparar um retreino. O Streamlit em `frontend/` é só um cliente HTTP dessa API, sem lógica própria — a mesma separação que motivou reescrever o projeto.
+A aba **Painel de treino** pede login, é onde eu (só eu) ensino exemplos novos.
 
-## Arquitetura
+Pra quem é da área e quer mexer na API direto: https://hatebr-api.onrender.com/docs
+
+## Feito com
+
+- Python, a linguagem do projeto todo
+- FastAPI, pra API
+- PostgreSQL, o banco de dados
+- SQLAlchemy e Alembic, pra falar com o banco e versionar as tabelas
+- JWT e bcrypt, pro login do painel
+- scikit-learn, pro modelo
+- Streamlit, pra interface do site
+- Docker, pra empacotar tudo
+- GitHub Actions, pra rodar os testes sozinho a cada commit
+- Render, onde tá hospedado
+
+## O que eu aprendi fazendo isso
+
+**Passar nos testes não é a mesma coisa que funcionar.** O primeiro deploy quebrou na hora. O Render me entrega o endereço do banco num formato (`postgresql://`) que o meu código não esperava, e o container caía antes de subir. Tudo passava nos testes e no CI, porque nenhum teste usava o endereço do jeito que o Render manda. Só apareceu em produção. Hoje tem teste pra esse formato.
+
+**O login contava quais emails existiam.** Numa revisão de segurança apareceu que o login respondia mais rápido quando o email não estava cadastrado, porque nem chegava a conferir a senha. Medindo o tempo de resposta, dava pra descobrir quem tinha conta. A correção foi conferir a senha sempre, contra um hash falso quando o email não existe, pra resposta levar o mesmo tempo nos dois casos.
+
+**O site mostrava "502" pra primeira pessoa que entrava.** O servidor gratuito dorme, e eu achei que a interface chamando a API ia acordar ela. Não acorda: o Render só acorda um serviço com tráfego vindo de fora, e a interface fala com a API por dentro. Fiquei um tempo com um retry esperando um boot que nunca começava, até olhar os logs e ver zero requisições chegando. A solução foi fazer o navegador de quem visita mandar um ping pra API logo que a página abre. Esse vem de fora, então acorda.
+
+**"eu te odeio" saía como não ofensivo.** Os dados são quase todos comentários longos de política no Instagram. Quase não tem frase curta dirigida a uma pessoa, e "odeio" lá aparece mais em coisa tipo "odeio esse governo". Então eu escrevi um conjunto de frases curtas, inclusive umas traiçoeiras como "odeio segunda-feira" e "morri de rir", e separei outras 60 frases que o modelo nunca vê no treino, só pra medir. O acerto nessas 60 foi de 75% pra 92%. Separar essas 60 foi o que me deixou confiar no número, senão eu tava só medindo se ele decorou.
+
+O projeto começou como dois scripts de Streamlit lendo o arquivo do modelo direto do disco. Virou um serviço de verdade, com a interface só conversando com a API. Essa virada foi o que eu mais aprendi.
+
+---
+
+Daqui pra baixo é a parte técnica, fechada em blocos. Clica pra abrir.
+
+<details>
+<summary><b>Arquitetura</b>: como as peças se conectam</summary>
 
 ![Arquitetura](docs/arquitetura.svg)
-
-Regra central: **`app/` não tem nenhuma dependência de `ml/` em tempo de import** — nenhum módulo da API importa o pacote de treino; ela só lê o artefato treinado (`ml/artefatos/modelo.pkl`). (O scikit-learn ainda entra no processo, mas pelo `joblib.load` que desserializa o pipeline, não pelo código de treino.) O único acoplamento é um `from ml.treinar import treinar` adiado dentro de `_executar_treino` (`app/routers/treinos.py`), que só executa quando alguém pede um retreino — e essa rota devolve `503` em produção e no `docker compose`, onde `TREINO_HABILITADO=false`. Na prática, portanto, treino e inferência são processos separados: os perfis de recurso são opostos, e é essa separação que permite rodar a API em um plano gratuito de 512 MB.
-
-A regra não é só uma promessa no README: `tests/test_arquitetura.py` percorre todo `.py` sob `app/` com `ast` e falha se alguém içar esse import para o topo de um módulo.
 
 ```
 app/          FastAPI: rotas, auth, banco, carregamento do modelo
@@ -37,25 +63,64 @@ ml/           treino: junta os datasets, valida com cross-validation, escreve mo
 frontend/     Streamlit, só chamadas HTTP pra API
 tests/        pytest + httpx, SQLite em memória
 alembic/      migrations
+main.py       sobe tudo local com um comando
 ```
 
-## Endpoints
+A regra central é que `app/` não importa `ml/` em tempo de import. A API só lê o artefato treinado (`ml/artefatos/modelo.pkl`) com `joblib.load`. O único ponto de contato é um `from ml.treinar import treinar` adiado dentro de `_executar_treino` (`app/routers/treinos.py`), que só roda quando alguém pede um retreino. Isso não é só promessa: `tests/test_arquitetura.py` percorre todo `.py` de `app/` com `ast` e falha se alguém subir esse import pro topo do módulo.
 
-| Método | Rota | Auth | Sucesso | Erros |
+O Streamlit em `frontend/app.py` não carrega modelo nem acessa banco. Ele só faz HTTP pra API. Quando a API tá dormindo, ele insiste por até 90 segundos de relógio antes de avisar que ela não respondeu, e dispara um `fetch` do navegador do visitante pro `/health` pra acordar o container.
+
+O modelo é um `sklearn.Pipeline` com um `FeatureUnion` de dois TF-IDF (palavras de 1 a 2 e pedaços de 2 a 5 letras, `char_wb`) seguido de regressão logística. As 204 frases curtas que eu escrevi (`ml/frases_curtas.csv`) entram só no fit final, com peso 20, e nunca nas dobras da validação cruzada, pra não inflar o F1. As 60 frases de avaliação ficam em `ml/avaliacao_frases_curtas.csv` e nunca entram no treino (tem teste checando que os dois arquivos não se sobrepõem).
+
+Números atuais:
+
+- F1 macro na validação cruzada (5 dobras): 0,782, em 28 mil comentários (HateBR + ToLD-BR)
+- Acerto nas 60 frases curtas nunca vistas: 92% (55 de 60). Antes era 75% (45 de 60)
+- 85 testes, 96% de cobertura em `app/`
+
+</details>
+
+<details>
+<summary><b>Rotas da API</b>: o que cada endpoint faz e devolve</summary>
+
+| Método | Rota | Login | Sucesso | Erros |
 |---|---|---|---|---|
-| `POST` | `/auth/login` | — | `200` + token | `401` |
-| `POST` | `/predicoes` | — | `201` | `422`, `503`, `429` |
+| `POST` | `/auth/login` | não | `200` + token | `401` |
+| `POST` | `/predicoes` | não | `201` | `422`, `503`, `429` |
 | `GET` | `/predicoes` | JWT | `200` paginado | `401` |
 | `POST` | `/exemplos` | JWT | `201` | `409`, `422`, `401` |
 | `GET` | `/exemplos` | JWT | `200` paginado | `401` |
 | `POST` | `/treinos` | JWT | `202` + id | `409`, `503`, `401` |
 | `GET` | `/treinos/{id}` | JWT | `200` | `404`, `401` |
-| `GET` | `/metricas` | — | `200` | — |
-| `GET` | `/health` | — | `200` | `503` |
+| `GET` | `/metricas` | não | `200` | |
+| `GET` | `/health` | não | `200` | `503` |
 
-## Como rodar
+`GET /` redireciona pro `/docs`. O `POST /predicoes` tem limite de 30 requisições por minuto por IP (`429` depois disso). O `/health` também confere o banco, não só se o processo tá vivo. No `/docs` tem o botão **Authorize** pra testar as rotas com login direto do navegador.
 
-A forma mais direta, sem Docker — clona, instala as dependências (API + frontend) e roda um único script que sobe tudo:
+</details>
+
+<details>
+<summary><b>Decisões de projeto e por quê</b></summary>
+
+- **Senha em bcrypt no banco, não SHA-256 em variável de ambiente.** Era assim na primeira versão. SHA-256 é rápido de propósito, o contrário do que se quer pra senha. bcrypt é lento de propósito e já vem com salt.
+- **Login sempre confere um hash**, mesmo quando o email não existe, pra não vazar pelo tempo de resposta quais contas existem.
+- **CSV, JSON e log soltos viraram tabelas.** Os exemplos ensinados e o histórico de treinos ficam nas tabelas `exemplo` e `treino`. Um `UNIQUE` em `exemplo.texto` barra exemplo repetido (a API devolve `409`), coisa que o CSV aceitava e enviesava o treino.
+- **Modelo e vetorizador num arquivo só.** Salvar os dois separados deixava eles saírem de sincronia. Agora é um `Pipeline` único.
+- **Treino separado da API.** Inferência quer pouca RAM e resposta rápida, treino quer muita RAM por alguns minutos. Separar é o que faz a API caber nos 512 MB do plano gratuito.
+- **Retreino desligado em produção, e dizendo por quê.** Com `TREINO_HABILITADO=false` (no `render.yaml` e no `docker-compose.yml`), `POST /treinos` devolve `503` explicando o motivo: pouca RAM pra validação cruzada e imagem sem os datasets.
+- **`JWT_SECRET` sem valor padrão.** Um default num repositório público seria um segredo que qualquer um lê. A aplicação prefere não subir a fingir que tá protegida. Em produção quem gera é o Render (`generateValue: true`).
+- **Predição não guarda IP nem nada de quem digitou.** A tabela `predicao` só tem texto, resultado e confiança. A rota é pública, pensei na LGPD.
+- **O retreino pela API só troca o modelo se o F1 melhorar** em relação ao melhor treino registrado.
+- **Frases curtas com peso 20.** Testei pesos de 1 a 150. Acima de 20 o acerto nas frases curtas quase não sobe e o F1 nos dados originais começa a cair.
+
+O que ficou de fora de propósito: frontend em React (o Streamlit já mostra a separação de camadas), fila tipo Celery (`BackgroundTasks` resolve pra um usuário só), transformers tipo BERTimbau (não cabe em 512 MB, e o ganho seria de modelo, não de engenharia), cadastro público de usuário (só eu treino, usuário nasce pelo `app/seed.py`), e observabilidade além de `logging`.
+
+</details>
+
+<details>
+<summary><b>Como rodar</b>: um comando, ou as peças separadas</summary>
+
+### O jeito rápido
 
 ```bash
 git clone https://github.com/ZazzySaint64/IA-Para-Discurso-de-dio.git
@@ -64,101 +129,72 @@ pip install -r requirements.txt -r frontend/requirements.txt
 python main.py
 ```
 
-`python main.py`: cria o `.env` se ele ainda não existir (gera um `JWT_SECRET` novo, aponta pra um SQLite local em `dev.db`) e não mexe nele se já existir; roda `alembic upgrade head`; sobe a API em `localhost:8000` e o Streamlit em `localhost:8501`, espera os dois responderem de verdade (a API em `/health`, o Streamlit na raiz — consultados em loop, não um sleep chutado) e abre o navegador. **Ctrl+C encerra os dois processos.** Se nenhum usuário existir ainda, ele avisa e imprime o comando de seed abaixo — a aba de treino do Streamlit não consegue logar sem um. As portas 8000 e 8501 precisam estar livres; se alguma estiver ocupada, o script diz qual e sai, sem procurar outra.
+O `main.py` cria o `.env` se ele não existir (com um `JWT_SECRET` novo e um SQLite local em `dev.db`), roda as migrations, sobe a API em `localhost:8000` e o Streamlit em `localhost:8501`, espera os dois responderem de verdade e abre o navegador. Ctrl+C fecha os dois. As portas 8000 e 8501 precisam estar livres, se não ele avisa qual tá ocupada e sai.
 
-Criar o usuário que treina o modelo (a senha aparece uma vez no terminal, salva num gerenciador de senhas):
+Pra usar o painel de treino precisa de um usuário (a senha aparece uma vez só no terminal):
 
 ```bash
 python -m app.seed --gerar-senha
 ```
 
-Este caminho existe porque o anterior — dois terminais, um `cp` e um `printf` — pedia comandos em bash mesmo quando quem lia estava no PowerShell, onde `printf` nem existe.
+### Com Docker (Postgres de verdade)
 
-### Rodar as peças separadas
-
-`main.py` só automatiza os comandos abaixo. Use-os direto para rodar via Docker — o único caminho com Postgres de verdade, o que `docker-compose.yml` e o CI usam — ou para depurar uma peça isolada.
-
-Pré-requisito: Docker e Docker Compose. Os comandos que dependem de Docker **não foram executados nesta máquina** (sem Docker instalado aqui) — `pytest` e `ruff`, mais abaixo, foram, de verdade, nesta mesma máquina.
+Esses comandos eu não rodei na minha máquina, porque não tenho Docker instalado aqui. São os mesmos que o CI e o `docker-compose.yml` usam.
 
 ```bash
-git clone https://github.com/ZazzySaint64/IA-Para-Discurso-de-dio.git
-cd IA-Para-Discurso-de-dio
 cp .env.exemplo .env
-```
-
-O `cp` vem antes de tudo porque `JWT_SECRET` não tem valor padrão — de propósito: um default num repositório público seria um segredo que qualquer pessoa lê, então a aplicação prefere recusar-se a subir a fingir que está protegida. Consequência prática: **todo comando que roda Python direto na máquina** (`python -m ml.treinar`, `python -m app.seed`) aborta na hora sem um `.env` (o `main.py` do caminho acima cria o dele sozinho; este `cp` é a versão manual da mesma necessidade). Pelo `docker compose` não faz falta, porque o `docker-compose.yml` já define as variáveis. O `.env` está no `.gitignore`, e o valor que vem no exemplo serve só para desenvolvimento local — em produção quem gera o segredo é o Render (`generateValue: true` no `render.yaml`).
-
-```bash
 docker compose up --build
-```
-
-Sobe Postgres, a API em `localhost:8000` (`/docs` pro Swagger) e o Streamlit em `localhost:8501`. As migrations rodam sozinhas no início do container (`entrypoint.sh`).
-
-Criar o usuário que treina o modelo (a senha aparece uma vez no terminal, salva num gerenciador de senhas):
-
-```bash
 docker compose run --rm api python -m app.seed --gerar-senha
 ```
 
-Retreinar o modelo roda **fora** do container — a imagem não leva os datasets, e treino e inferência têm perfis de recurso opostos (ver "Decisões de projeto"). Baixe o [HateBR](https://github.com/franciellevargas/HateBR) e o [ToLD-BR](https://github.com/JAugusto97/ToLD-Br) e coloque `HateBR.csv` e `ToLD-BR.csv` em `HateBR-7.0.0/dataset/`, depois, com o `.env` já criado (acima) e o Postgres do `docker compose up` no ar — ele expõe a porta 5432, que é a que o `.env.exemplo` aponta:
+Sobe Postgres, a API e o Streamlit. As migrations rodam sozinhas no início do container (`entrypoint.sh`).
+
+### Retreinar o modelo
+
+Roda fora do container, porque a imagem não leva os datasets. Baixa o [HateBR](https://github.com/franciellevargas/HateBR) e o [ToLD-BR](https://github.com/JAugusto97/ToLD-Br), coloca `HateBR.csv` e `ToLD-BR.csv` em `HateBR-7.0.0/dataset/`, e com o `.env` criado:
 
 ```bash
-pip install -r requirements.txt
 python -m ml.treinar
 ```
 
-Só substitui `ml/artefatos/modelo.pkl` se o novo F1 for maior que o melhor já registrado. (Este comando específico não foi rodado ao escrever este README — rodá-lo de verdade reescreveria o artefato já versionado no repositório; a sintaxe foi conferida lendo `ml/treinar.py`, não executando-o.)
+Esse caminho sempre grava o `ml/artefatos/modelo.pkl` novo. A trava de "só troca se melhorar" vale pro retreino disparado pela API.
 
-Rodar os testes (verificado nesta máquina, sem Docker, com SQLite em memória):
+### Testes
 
 ```bash
 pip install -r requirements-dev.txt
 pytest --cov=app --cov-report=term-missing
 ```
 
-71 testes, cobertura de 96% em `app/`.
+85 testes, 96% de cobertura em `app/`. Rodam com SQLite em memória, sem Docker. No CI rodam contra um Postgres 16.
 
-## Como colocar no ar
+### Deploy
 
-O deploy é via [Render](https://render.com) Blueprint, lendo o `render.yaml` já commitado no repositório:
+É um Blueprint do Render lendo o `render.yaml`: cria o banco `hatebr-db`, a API `hatebr-api` (Docker) e a interface `hatebr-web`, tudo no plano gratuito. Depois do primeiro deploy, o usuário é criado uma vez rodando o seed da minha máquina contra a URL externa do banco:
 
-1. Cria uma conta no Render.
-2. **New → Blueprint**, conecta este repositório do GitHub.
-3. O Render lê o `render.yaml` e cria sozinho o banco (`hatebr-db`, Postgres, plano free) e o serviço web (`hatebr-api`, Docker, plano free, health check em `/health`), gerando o `JWT_SECRET` automaticamente. `TREINO_HABILITADO` já entra como `false` em produção.
-4. Espera o build. As migrations rodam sozinhas no start do container (`entrypoint.sh`).
-5. Roda o seed **uma vez**, contra o banco do Render: no dashboard do `hatebr-db`, aba **Connect**, copia a "External Database URL", e roda localmente — este comando roda na tua máquina, não no container, então precisa do repositório clonado, do `pip install -r requirements.txt` e do `.env` criado em "Como rodar":
-   ```bash
-   DATABASE_URL="<external-database-url-do-render>" python -m app.seed --gerar-senha
-   ```
-   O `JWT_SECRET` do `.env` local não importa aqui: o seed só grava um hash bcrypt, não assina token nenhum — quem assina em produção é o segredo que o Render gerou. Guarda a senha impressa — ela não é gravada em lugar nenhum, só aparece essa vez.
+```bash
+DATABASE_URL="<external-database-url-do-render>" python -m app.seed --gerar-senha
+```
 
-## Decisões de projeto
+</details>
 
-- **SHA-256 em variável de ambiente virou bcrypt no banco.** SHA-256 é rápido de propósito, o oposto do que se quer em hash de senha; bcrypt é lento de propósito e já embute salt, então a mesma senha gera hashes diferentes e rainbow table não serve.
-- **CSV, JSON e log soltos viraram tabelas.** Os exemplos ensinados, a melhor métrica já alcançada e o histórico de execuções, antes um CSV, um JSON e um arquivo de log soltos, viraram as tabelas `exemplo` e `treino` no Postgres. A constraint `UNIQUE` em `exemplo.texto` impede o mesmo exemplo repetido, coisa que o CSV aceitava e enviesava o treino — a API devolve `409`.
-- **Modelo e vetorizador separados viraram um pipeline só.** Salvar os dois passos (`TfidfVectorizer` + `LogisticRegression`) separadamente permite que saiam de sincronia; agora é um `sklearn.Pipeline` único, `joblib.dump` de um arquivo só.
-- **Treino separado da API.** Perfis de recurso opostos — inferência quer latência baixa e pouca RAM, treino quer bastante RAM por alguns minutos — e essa separação é o que cabe em um plano gratuito de 512 MB.
-- **Retreino desligado em produção, com o motivo, não escondido.** A flag `TREINO_HABILITADO` (definida como `false` no `render.yaml` e no `docker-compose.yml`) controla `POST /treinos`; sem ela a rota devolve `503` explicando exatamente por quê (RAM insuficiente pra cross-validation, imagem sem os datasets).
-- **Predição não guarda IP nem identificação de quem digitou.** A tabela `predicao` só tem texto, label e confiança — decisão pensando em LGPD, já que a rota é pública.
+<details>
+<summary><b>Limitações conhecidas</b>: o que ainda não funciona bem</summary>
 
-## O que ficou de fora e por quê
+- **O servidor gratuito dorme.** Depois de 15 minutos parado, o primeiro acesso leva até um minuto e meio.
+- **Algumas frases curtas ainda passam.** Das 60 de avaliação, erra 5: "morre logo", "espero que se exploda", "eu te detesto" e "você me enoja" saem como não ofensivas (hostilidade sem palavrão e sem "odeio", tipo "detesto" e "enoja", o modelo ainda não pega), e "você é o máximo" sai como ofensiva. É um modelo linear simples, não um transformer. Serve pra mostrar a engenharia, não pra moderar conteúdo de verdade.
+- **Os rótulos das frases curtas fui eu que escrevi.** Refletem o meu julgamento do que é ofensivo, e outra pessoa podia rotular diferente.
+- **Dois retreinos exatamente ao mesmo tempo podem começar os dois.** A checagem de "já tem treino rodando" e a criação do novo não são atômicas. O duplo clique no botão tá coberto, porque o primeiro treino é gravado no banco antes da resposta voltar.
+- **Se o modelo novo for gravado mas falhar ao carregar**, o treino fica como `falhou` sem guardar o F1, e o `/metricas` continua mostrando o F1 antigo. É raro (o arquivo precisa ser escrito certo e ler errado logo depois).
+- **Retreino desligado em produção.** Pra retreinar tem que rodar `python -m ml.treinar` fora do Render.
+- **O banco gratuito do Render expira depois de 30 dias.** Depois disso tem que recriar o banco e rodar o seed de novo.
 
-- **Frontend em React ou Next.js.** O Streamlit como cliente HTTP já demonstra a separação de camadas dentro do prazo do projeto.
-- **Fila de tarefas (Celery, Redis, RQ).** `BackgroundTasks` do FastAPI resolve o caso de um único usuário treinando o modelo; fila seria complexidade sem demanda.
-- **Troca do modelo por transformers (BERTimbau).** O ganho seria de domínio (melhor F1), não de engenharia, e o modelo não cabe em 512 MB de RAM.
-- **Cadastro público de usuários, recuperação de senha, papéis e permissões.** Só o dono treina o modelo; usuários nascem por `app/seed.py`, não por rota pública — menos superfície de ataque, menos código.
-- **Observabilidade além de `logging`.** A API loga em texto os eventos que importam (modelo carregado ou ausente no start, treino iniciado, concluído com o F1, falhado com o erro). Métricas, tracing e log estruturado em JSON ficaram fora de escopo para um projeto de portfólio de duas semanas.
+</details>
 
-## Limitações conhecidas
+<details>
+<summary><b>Licenças dos datasets e créditos</b></summary>
 
-- **`POST /treinos` tem uma corrida (TOCTOU).** A checagem de "já existe treino rodando" e a criação do novo registro não são atômicas: duas requisições verdadeiramente simultâneas podem, em teoria, iniciar dois treinos ao mesmo tempo. O caso realista — um duplo clique no botão do painel — está coberto, porque a linha do primeiro treino é commitada no banco antes da resposta voltar pro cliente.
-- **Se a recarga do modelo falhar, o F1 daquele retreino se perde.** Quando o retreino melhora o score, `_executar_treino` grava o `.pkl` novo e só então chama `ml.carregar_modelo`. Se essa carga levantar (artefato corrompido, disco cheio), a linha vai para `falhou` sem gravar o `f1_macro` — e o artefato novo, que já está em disco, passa a ser servido no próximo restart enquanto `/metricas` continua publicando o F1 antigo, mais baixo. Como esse mesmo número é a baseline do próximo treino, um modelo pior poderia depois sobrescrever um melhor. É raro (exige o `joblib.dump` funcionar e o `joblib.load` seguinte não), e marcar a linha como `falhou` é deliberado: um artefato que não carrega é um retreino que falhou do ponto de vista de quem consome a API. Fica registrado em vez de escondido.
-- **Retreino desligado no container e em produção.** `TREINO_HABILITADO=false` tanto no `docker compose` local quanto no Render; para retreinar de fato, roda `python -m ml.treinar` fora do Docker (ver "Como rodar"). É uma limitação deliberada, não um bug — está documentada em "Decisões de projeto".
-- **Qualidade real do modelo: F1 macro ≈ 0,75.** É um modelo linear simples (TF-IDF + Regressão Logística), não um transformer. Ele erra frases curtas e sem alvo explícito — por exemplo, classifica "eu te odeio" como não-ódio, com confiança baixa (~60%). Serve bem como demonstração de engenharia; não é production-grade para moderação de conteúdo real.
-
-## Licenças dos datasets
-
-Modelo treinado com dois datasets acadêmicos de português. Eles **não** são redistribuídos neste repositório — cada um tem sua própria licença:
+O modelo foi treinado com dois datasets acadêmicos de português. Eles **não** estão neste repositório, cada um tem a sua licença, dá uma lida antes de usar:
 
 - [HateBR](https://github.com/franciellevargas/HateBR)
 
@@ -183,4 +219,6 @@ Modelo treinado com dois datasets acadêmicos de português. Eles **não** são 
   }
   ```
 
-Licença do código: MIT (ver `LICENSE`).
+Licença do meu código: MIT (ver `LICENSE`).
+
+</details>
